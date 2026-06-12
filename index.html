@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GEX Analyzer — Gamma Exposure Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">GEX<span class="logo-accent">Analyzer</span></h1>
+                <span class="tagline">Free · Real-Time · No API Keys</span>
+            </div>
+            <div class="header-right">
+                <div class="status-pill" id="regimePill">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="regimeText">Loading...</span>
+                </div>
+                <span class="last-update" id="lastUpdate">--</span>
+                <button class="refresh-btn" id="refreshBtn" onclick="app.refresh()" title="Refresh data">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Mobile Nav Toggle -->
+        <button class="mobile-nav-toggle" id="mobileNavToggle" onclick="ui.toggleSidebar()">
+            <span></span><span></span><span></span>
+        </button>
+
+        <!-- Main Layout -->
+        <div class="main-layout" id="mainLayout">
+            <!-- Sidebar -->
+            <aside class="sidebar" id="sidebar">
+                <!-- Search Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">🔍</span>
+                        <span class="card-title">Compute GEX Levels</span>
+                    </div>
+                    <div class="search-box">
+                        <input type="text" id="tickerInput" placeholder="Enter ticker (e.g. SPY)" value="SPY" autocomplete="off">
+                        <button class="search-btn" id="searchBtn" onclick="app.searchTicker()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Asset Tabs -->
+                    <div class="asset-tabs" id="assetTabs">
+                        <button class="asset-tab active" data-class="equity" onclick="ui.switchAssetClass('equity')">Equities</button>
+                        <button class="asset-tab" data-class="etf" onclick="ui.switchAssetClass('etf')">ETFs</button>
+                        <button class="asset-tab" data-class="futures" onclick="ui.switchAssetClass('futures')">Futures</button>
+                        <button class="asset-tab" data-class="crypto" onclick="ui.switchAssetClass('crypto')">Crypto</button>
+                        <button class="asset-tab" data-class="fx" onclick="ui.switchAssetClass('fx')">FX</button>
+                        <button class="asset-tab" data-class="commodity" onclick="ui.switchAssetClass('commodity')">Commod</button>
+                    </div>
+
+                    <!-- Ticker Grid -->
+                    <div class="ticker-grid" id="tickerGrid"></div>
+
+                    <!-- Proxy Selector -->
+                    <div class="proxy-selector">
+                        <label>CORS Proxy</label>
+                        <select id="proxySelect">
+                            <option value="corsproxy">corsproxy.io</option>
+                            <option value="allorigins">allorigins.win</option>
+                            <option value="corsanywhere">cors-anywhere</option>
+                        </select>
+                        <span class="proxy-note">Switch if data fails to load</span>
+                    </div>
+                </div>
+
+                <!-- Expirations Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-icon">📅</span>
+                        <span class="card-title">Select Expiration</span>
+                        <span class="exp-count" id="expCount"></span>
+                    </div>
+                    <div class="exp-list" id="expList">
+                        <div class="exp-placeholder">Search a ticker to load expirations</div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button class="generate-btn" id="generateBtn" onclick="app.generateGEX()" disabled>
+                    <span class="generate-icon">⚡</span>
+                    <span>Generate GEX</span>
+                </button>
+
+                <!-- Key Levels Card -->
+                <div class="card" id="levelsCard" style="display:none;">
+                    <div class="card-header">
+                        <span class="card-icon">🎯</span>
+                        <span class="card-title">Key Levels</span>
+                    </div>
+                    <div class="levels-list" id="levelsList"></div>
+                </div>
+
+                <!-- What is GEX Card -->
+                <div class="card info-card">
+                    <div class="card-header">
+                        <span class="card-icon">❓</span>
+                        <span class="card-title">What is GEX?</span>
+                    </div>
+                    <div class="info-content">
+                        <p>Gamma Exposure measures how option deltas change with price moves.</p>
+                        <div class="info-section">
+                            <strong class="green">Positive GEX</strong>
+                            <p>Dealers sell rallies, buy dips — <strong>stabilizing</strong></p>
+                        </div>
+                        <div class="info-section">
+                            <strong class="red">Negative GEX</strong>
+                            <p>Dealers buy rallies, sell dips — <strong>amplifying</strong></p>
+                        </div>
+                        <div class="info-section">
+                            <strong>Key Levels</strong>
+                            <ul>
+                                <li><span class="dot green"></span> Call Wall — resistance</li>
+                                <li><span class="dot red"></span> Put Wall — support</li>
+                                <li><span class="dot purple"></span> Gamma Flip — regime change</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="content" id="content">
+                <!-- Price Bar -->
+                <div class="price-bar" id="priceBar" style="display:none;">
+                    <div class="price-stat">
+                        <div class="price-label">Spot Price</div>
+                        <div class="price-value" id="statPrice">--</div>
+                        <div class="price-change" id="statChange">--</div>
+                    </div>
+                    <div class="price-stat">
+                        <div class="price-label">Gamma Zone</div>
+                        <div class="price-value" id="statZone">--</div>
+                        <div class="price-desc" id="statZoneDesc">--</div>
+                    </div>
+                    <div class="price-stat">
+                        <div class="price-label">Total GEX</div>
+                        <div class="price-value" id="statTotalGEX">--</div>
+                        <div class="price-desc" id="statTotalGEXDesc">--</div>
+                    </div>
+                    <div class="price-stat">
+                        <div class="price-label">Call Wall</div>
+                        <div class="price-value" id="statCallWall">--</div>
+                        <div class="price-desc">Resistance</div>
+                    </div>
+                    <div class="price-stat">
+                        <div class="price-label">Put Wall</div>
+                        <div class="price-value" id="statPutWall">--</div>
+                        <div class="price-desc">Support</div>
+                    </div>
+                </div>
+
+                <!-- Chart Card -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <span id="chartTicker">--</span>
+                            <span class="chart-exp" id="chartExp">--</span>
+                        </div>
+                        <div class="chart-controls">
+                            <button class="ctrl-btn active" data-series="gex" onclick="chart.toggleSeries('gex')">GEX</button>
+                            <button class="ctrl-btn active" data-series="dex" onclick="chart.toggleSeries('dex')">DEX</button>
+                            <button class="ctrl-btn" data-series="vanna" onclick="chart.toggleSeries('vanna')">Vanna</button>
+                            <button class="ctrl-btn" data-series="charm" onclick="chart.toggleSeries('charm')">Charm</button>
+                            <button class="ctrl-btn" data-series="oi" onclick="chart.toggleSeries('oi')">OI</button>
+                            <button class="ctrl-btn" data-series="iv" onclick="chart.toggleSeries('iv')">IV Skew</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="gexChart"></canvas>
+                        <div class="loading-overlay" id="loadingOverlay">
+                            <div class="spinner"></div>
+                            <div class="loading-text">Fetching options data...</div>
+                        </div>
+                    </div>
+                    <div class="chart-legend" id="chartLegend"></div>
+                </div>
+
+                <!-- Greeks Panel -->
+                <div class="greeks-panel" id="greeksPanel" style="display:none;">
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">📊</span>
+                            <span class="greek-title">Max Pain</span>
+                        </div>
+                        <div class="greek-value" id="greekMaxPain">--</div>
+                        <div class="greek-desc">Strike where most options expire worthless</div>
+                    </div>
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">⚖️</span>
+                            <span class="greek-title">Put/Call Ratio (OI)</span>
+                        </div>
+                        <div class="greek-value" id="greekPCR">--</div>
+                        <div class="greek-desc" id="greekPCRDesc">--</div>
+                    </div>
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">📈</span>
+                            <span class="greek-title">Net Delta (DEX)</span>
+                        </div>
+                        <div class="greek-value" id="greekNetDelta">--</div>
+                        <div class="greek-desc">Total directional exposure</div>
+                    </div>
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">💨</span>
+                            <span class="greek-title">Net Vanna</span>
+                        </div>
+                        <div class="greek-value" id="greekNetVanna">--</div>
+                        <div class="greek-desc">Vol sensitivity of delta</div>
+                    </div>
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">⏳</span>
+                            <span class="greek-title">Net Charm</span>
+                        </div>
+                        <div class="greek-value" id="greekNetCharm">--</div>
+                        <div class="greek-desc">Time decay of delta</div>
+                    </div>
+                    <div class="greek-card">
+                        <div class="greek-header">
+                            <span class="greek-icon">🌊</span>
+                            <span class="greek-title">IV Skew</span>
+                        </div>
+                        <div class="greek-value" id="greekIVSkew">--</div>
+                        <div class="greek-desc" id="greekIVSkewDesc">--</div>
+                    </div>
+                </div>
+
+                <!-- Regime Analysis -->
+                <div class="analysis-card" id="analysisCard" style="display:none;">
+                    <div class="analysis-header">
+                        <span class="analysis-icon">⚡</span>
+                        <span class="analysis-title">Regime Analysis</span>
+                    </div>
+                    <div class="analysis-content" id="analysisContent"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <span>Data from Yahoo Finance · Delayed 15-30 min · For educational purposes only</span>
+            <button class="demo-btn" id="demoBtn" onclick="app.loadDemo()">Load Demo Data</button>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="greek-engine.js"></script>
+    <script src="yahoo-client.js"></script>
+    <script src="chart-builder.js"></script>
+    <script src="ui-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
