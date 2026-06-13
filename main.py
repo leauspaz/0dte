@@ -322,7 +322,8 @@ class GEXCalculator:
                 t = self.engine.theta(self.S, strike, T, self.r, iv, True)
                 ve = self.engine.vega(self.S, strike, T, self.r, iv)
 
-                call_gex = g * oi * self.S * 100
+                # FIX: GEX = gamma * OI * 100 * S^2 * 0.01 (per 1% move)
+                call_gex = g * oi * 100 * self.S * self.S * 0.01
                 call_dex = d * oi * 100
                 call_vanna = v * oi * 100
                 call_charm = c * oi * 100
@@ -352,7 +353,8 @@ class GEXCalculator:
                 t = self.engine.theta(self.S, strike, T, self.r, iv, False)
                 ve = self.engine.vega(self.S, strike, T, self.r, iv)
 
-                put_gex = -g * oi * self.S * 100
+                # FIX: Put GEX is negative (dealers short puts = negative gamma)
+                put_gex = -g * oi * 100 * self.S * self.S * 0.01
                 put_dex = d * oi * 100
                 put_vanna = -v * oi * 100
                 put_charm = c * oi * 100
@@ -390,28 +392,50 @@ class GEXCalculator:
                 avg_iv=(call_iv + put_iv) / 2 if call_iv or put_iv else 0
             ))
 
-        # Calculate cumulative GEX and DEX
+        # FIX: Calculate cumulative GEX from ATM outward, not from low to high
+        # Find ATM index
+        atm_idx = 0
+        min_diff = float('inf')
+        for i, item in enumerate(results):
+            diff = abs(item.strike - self.S)
+            if diff < min_diff:
+                min_diff = diff
+                atm_idx = i
+
+        # Cumulate GEX from ATM downward (puts side)
         cum_gex = 0.0
         cum_dex = 0.0
-        for item in results:
-            cum_gex += item.total_gex
-            cum_dex += item.total_dex
-            item.cumulative_gex = cum_gex
-            item.cumulative_dex = cum_dex
+        for i in range(atm_idx, -1, -1):
+            cum_gex += results[i].total_gex
+            cum_dex += results[i].total_dex
+            results[i].cumulative_gex = cum_gex
+            results[i].cumulative_dex = cum_dex
 
-        # Calculate aggregate GEX (recalculate as if each strike were spot)
+        # Cumulate GEX from ATM upward (calls side)
+        cum_gex = 0.0
+        cum_dex = 0.0
+        for i in range(atm_idx, len(results)):
+            cum_gex += results[i].total_gex
+            cum_dex += results[i].total_dex
+            results[i].cumulative_gex = cum_gex
+            results[i].cumulative_dex = cum_dex
+
+        # FIX: Calculate aggregate GEX correctly
+        # Aggregate GEX at each strike = total GEX if spot were at that strike
+        # This requires recalculating gamma for ALL options using each strike as hypothetical spot
         for item in results:
             agg_gex = 0.0
             agg_dex = 0.0
+            hypothetical_spot = item.strike
             for other in results:
                 if other.call_oi > 0:
                     iv = other.call_iv or 0.25
-                    g = self.engine.gamma(item.strike, other.strike, T, self.r, iv)
-                    agg_gex += g * other.call_oi * item.strike * 100
+                    g = self.engine.gamma(hypothetical_spot, other.strike, T, self.r, iv)
+                    agg_gex += g * other.call_oi * 100 * hypothetical_spot * hypothetical_spot * 0.01
                 if other.put_oi > 0:
                     iv = other.put_iv or 0.25
-                    g = self.engine.gamma(item.strike, other.strike, T, self.r, iv)
-                    agg_gex -= g * other.put_oi * item.strike * 100
+                    g = self.engine.gamma(hypothetical_spot, other.strike, T, self.r, iv)
+                    agg_gex -= g * other.put_oi * 100 * hypothetical_spot * hypothetical_spot * 0.01
             item.aggregate_gex = agg_gex
             item.aggregate_dex = agg_dex
 
@@ -447,20 +471,23 @@ class KeyLevelsFinder:
         # Put wall: most negative total GEX
         put_wall = min(data, key=lambda x: x.total_gex).strike
 
-        # Zero gamma: total GEX closest to zero
+        # Zero gamma: individual strike closest to zero GEX
         zero_gamma = min(data, key=lambda x: abs(x.total_gex)).strike
 
-        # Inflection: cumulative GEX crosses zero
+        # FIX: Inflection point - find where aggregate GEX crosses zero
+        # This is the correct definition: where total gamma exposure flips sign
+        # as spot price changes
         inflection = None
-        prev_cum = data[0].cumulative_gex
+        prev_agg = data[0].aggregate_gex
         for item in data[1:]:
-            if (prev_cum < 0 and item.cumulative_gex >= 0) or (prev_cum >= 0 and item.cumulative_gex < 0):
+            if (prev_agg < 0 and item.aggregate_gex >= 0) or (prev_agg >= 0 and item.aggregate_gex < 0):
                 inflection = item.strike
                 break
-            prev_cum = item.cumulative_gex
+            prev_agg = item.aggregate_gex
 
         if inflection is None:
-            inflection = min(data, key=lambda x: abs(x.cumulative_gex)).strike
+            # Fallback: find strike where aggregate GEX is closest to zero
+            inflection = min(data, key=lambda x: abs(x.aggregate_gex)).strike
 
         # Max pain
         max_pain = None
@@ -476,7 +503,7 @@ class KeyLevelsFinder:
                 min_pain = pain
                 max_pain = item.strike
 
-        # Net GEX at spot
+        # Net GEX at spot (find closest strike to spot)
         net_gex = 0.0
         net_dex = 0.0
         for item in data:
@@ -494,6 +521,10 @@ class KeyLevelsFinder:
         atm_item = min(data, key=lambda x: abs(x.strike - spot_price))
         iv_skew = (atm_item.put_iv - atm_item.call_iv) * 100
 
+        # FIX: is_positive_gamma should check if spot is above inflection
+        # when aggregate GEX is positive above inflection
+        is_positive = spot_price > inflection if inflection else True
+
         return KeyLevels(
             call_wall=call_wall,
             put_wall=put_wall,
@@ -506,7 +537,7 @@ class KeyLevelsFinder:
             total_dex=total_dex,
             total_vanna=total_vanna,
             total_charm=total_charm,
-            is_positive_gamma=spot_price > inflection,
+            is_positive_gamma=is_positive,
             iv_skew=iv_skew,
             spot_price=spot_price
         )
@@ -528,8 +559,6 @@ def static_files(path):
 @app.route('/api/quote/<ticker>')
 def api_quote(ticker):
     try:
-        # yfinance uses ^ prefix for indices (e.g., ^SPX, ^NDX)
-        # Pass ticker as-is
         quote = YahooClient.get_quote(ticker)
         return jsonify(asdict(quote))
     except Exception as e:
@@ -550,28 +579,16 @@ def api_gex(ticker):
         return jsonify({'error': 'Missing expiration parameter'}), 400
 
     try:
-        # Get quote
         quote = YahooClient.get_quote(ticker)
-
-        # Get options chain
         calls, puts = YahooClient.get_options_chain(ticker, expiration)
         if calls is None or puts is None:
-            # Check if ticker is an unsupported type
-            unsupported_prefixes = ('ES=', 'NQ=', 'YM=', 'RTY=', 'GC=', 'SI=', 'CL=', 'NG=', 'ZB=', 'ZN=', 'ZW=', 'ZC=', 'ZS=', 'KC=', 'CT=', 'CC=', 'SB=', 'HG=', 'PA=', 'PL=', 'BTC-', 'ETH-', 'SOL-', 'XRP-', 'ADA-', 'DOGE-', 'EURUSD=', 'GBPUSD=', 'USDJPY=', 'AUDUSD=')
-            is_unsupported = ticker.upper().startswith(unsupported_prefixes)
-            if is_unsupported:
-                return jsonify({'error': f'{ticker} does not have options data on Yahoo Finance. Only individual stocks and ETFs are supported for GEX analysis. Try SPY, QQQ, TSLA, NVDA, AAPL, etc.'}), 404
-            return jsonify({'error': 'No options data available for this ticker. It may not have options, or Yahoo Finance may be temporarily unavailable.'}), 404
+            return jsonify({'error': 'No options data available for this ticker.'}), 404
 
-        # Calculate Greeks
         calc = GEXCalculator(quote.price)
         exp_date = datetime.strptime(expiration, '%Y-%m-%d')
         results, summary = calc.calculate(calls, puts, exp_date)
-
-        # Find key levels
         levels = KeyLevelsFinder.find(results, quote.price)
 
-        # Convert to dicts for JSON
         data_dicts = [asdict(item) for item in results]
         levels_dict = asdict(levels)
         summary_dict = asdict(summary)
@@ -594,7 +611,6 @@ def api_gex(ticker):
 # ============================================================================
 
 def open_browser():
-    """Open browser after server starts."""
     import time
     time.sleep(1.5)
     webbrowser.open(f'http://{HOST}:{PORT}')
@@ -606,8 +622,5 @@ if __name__ == '__main__':
     print(f"\n  Starting server at http://{HOST}:{PORT}")
     print("  Opening browser automatically...\n")
 
-    # Open browser in background thread
     threading.Thread(target=open_browser, daemon=True).start()
-
-    # Run Flask server
     app.run(host=HOST, port=PORT, debug=False, threaded=True)

@@ -1,6 +1,5 @@
 /* ===== CHART BUILDER =====
- * Horizontal GEX chart — single axis, hardcoded colors
- * Restored from working version + annotation v3 syntax fixes
+ * Horizontal GEX chart — normalized Y-axis, no zoom, clean interaction
  */
 
 const ChartBuilder = (function() {
@@ -13,7 +12,7 @@ const ChartBuilder = (function() {
     let activeSeries = 'gex';
 
     let showAggregate = true;
-    let showNet = true;
+    let showNet = false;  // OFF by default
     let showSplit = false;
     let showCallWall = true;
     let showPutWall = true;
@@ -59,26 +58,42 @@ const ChartBuilder = (function() {
         return d[camel] !== undefined ? d[camel] : (d[snake] !== undefined ? d[snake] : 0);
     }
 
+    // Gaussian smoothing
     function smooth(data, ws) {
         if (!ws || ws < 2) return data;
         const res = [];
+        const half = Math.floor(ws / 2);
+        const sigma = ws / 3;
         for (let i = 0; i < data.length; i++) {
-            let sum = 0, cnt = 0;
-            const h = Math.floor(ws / 2);
-            for (let j = Math.max(0, i - h); j <= Math.min(data.length - 1, i + h); j++) {
-                sum += data[j]; cnt++;
+            let sum = 0, weightSum = 0;
+            for (let j = Math.max(0, i - half); j <= Math.min(data.length - 1, i + half); j++) {
+                const dist = j - i;
+                const weight = Math.exp(-(dist * dist) / (2 * sigma * sigma));
+                sum += data[j] * weight;
+                weightSum += weight;
             }
-            res.push(sum / cnt);
+            res.push(sum / weightSum);
         }
         return res;
     }
 
+    // Normalize data to [-1, 1] range relative to max absolute value
+    function normalize(arr) {
+        const maxAbs = Math.max(...arr.map(Math.abs));
+        if (maxAbs === 0) return arr.map(() => 0);
+        return arr.map(v => v / maxAbs);
+    }
+
     function buildDatasets(data, spotPrice, series) {
         const datasets = [];
-        const range = 0.12;
+        const range = 0.08;
         const minS = spotPrice * (1 - range);
         const maxS = spotPrice * (1 + range);
-        const filtered = data.filter(d => d.strike >= minS && d.strike <= maxS);
+
+        let filtered = data.filter(d => d.strike >= minS && d.strike <= maxS);
+        filtered.sort((a, b) => a.strike - b.strike);
+        filtered.reverse(); // High strike at top
+
         const labels = filtered.map(d => d.strike.toFixed(1));
         const sw = parseInt(localStorage.getItem('gex-smoothing') || '7');
 
@@ -103,55 +118,101 @@ const ChartBuilder = (function() {
             });
         };
 
+        let allBarValues = [];
+
         if (series === 'gex') {
             if (showSplit) {
-                addBar('Put GEX', filtered.map(d => get(d, 'putGEX', 'put_gex')), COLORS.put, COLORS.putBorder);
-                addBar('Call GEX', filtered.map(d => get(d, 'callGEX', 'call_gex')), COLORS.call, COLORS.callBorder);
+                const putVals = filtered.map(d => get(d, 'putGEX', 'put_gex'));
+                const callVals = filtered.map(d => get(d, 'callGEX', 'call_gex'));
+                allBarValues = [...putVals, ...callVals];
+                const normPut = normalize(putVals);
+                const normCall = normalize(callVals);
+                addBar('Put GEX', normPut, COLORS.put, COLORS.putBorder);
+                addBar('Call GEX', normCall, COLORS.call, COLORS.callBorder);
             } else {
-                addBar('Net GEX', filtered.map(d => get(d, 'totalGEX', 'total_gex')),
+                const netVals = filtered.map(d => get(d, 'totalGEX', 'total_gex'));
+                allBarValues = netVals;
+                const normNet = normalize(netVals);
+                addBar('Net GEX', normNet,
                     (ctx) => { const v = ctx.raw; return v >= 0 ? COLORS.call : COLORS.put; },
                     (ctx) => { const v = ctx.raw; return v >= 0 ? COLORS.callBorder : COLORS.putBorder; });
             }
-            if (showAggregate) addLine('Aggregate GEX', smooth(filtered.map(d => get(d, 'aggregateGEX', 'aggregate_gex')), sw), COLORS.aggregate);
-            if (showNet) addLine('Cumulative GEX', smooth(filtered.map(d => get(d, 'cumulativeGEX', 'cumulative_gex')), sw), COLORS.net, true);
+            if (showAggregate) {
+                const aggVals = smooth(filtered.map(d => get(d, 'aggregateGEX', 'aggregate_gex')), sw);
+                addLine('Aggregate GEX', normalize(aggVals), COLORS.aggregate);
+            }
+            if (showNet) {
+                const cumVals = smooth(filtered.map(d => get(d, 'cumulativeGEX', 'cumulative_gex')), sw);
+                addLine('Cumulative GEX', normalize(cumVals), COLORS.net, true);
+            }
         }
 
         if (series === 'dex') {
             if (showSplit) {
-                addBar('Put DEX', filtered.map(d => get(d, 'putDEX', 'put_dex')), 'hsla(0, 72%, 51%, 0.40)', 'hsla(0, 72%, 51%, 0.60)');
-                addBar('Call DEX', filtered.map(d => get(d, 'callDEX', 'call_dex')), 'hsla(142, 71%, 45%, 0.40)', 'hsla(142, 71%, 45%, 0.60)');
+                const putVals = filtered.map(d => get(d, 'putDEX', 'put_dex'));
+                const callVals = filtered.map(d => get(d, 'callDEX', 'call_dex'));
+                allBarValues = [...putVals, ...callVals];
+                addBar('Put DEX', normalize(putVals), 'hsla(0, 72%, 51%, 0.40)', 'hsla(0, 72%, 51%, 0.60)');
+                addBar('Call DEX', normalize(callVals), 'hsla(142, 71%, 45%, 0.40)', 'hsla(142, 71%, 45%, 0.60)');
             } else {
-                addBar('Net DEX', filtered.map(d => get(d, 'totalDEX', 'total_dex')),
+                const netVals = filtered.map(d => get(d, 'totalDEX', 'total_dex'));
+                allBarValues = netVals;
+                addBar('Net DEX', normalize(netVals),
                     (ctx) => { const v = ctx.raw; return v >= 0 ? 'hsla(142, 71%, 45%, 0.45)' : 'hsla(0, 72%, 51%, 0.45)'; },
                     (ctx) => { const v = ctx.raw; return v >= 0 ? 'hsla(142, 71%, 45%, 0.65)' : 'hsla(0, 72%, 51%, 0.65)'; });
             }
-            if (showNet) addLine('Cumulative DEX', smooth(filtered.map(d => get(d, 'cumulativeDEX', 'cumulative_dex')), sw), COLORS.dex, true);
+            if (showNet) {
+                const cumVals = smooth(filtered.map(d => get(d, 'cumulativeDEX', 'cumulative_dex')), sw);
+                addLine('Cumulative DEX', normalize(cumVals), COLORS.dex, true);
+            }
         }
 
         if (series === 'vanna') {
             if (showSplit) {
-                addBar('Put Vanna', filtered.map(d => get(d, 'putVanna', 'put_vanna')), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
-                addBar('Call Vanna', filtered.map(d => get(d, 'callVanna', 'call_vanna')), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
+                const putVals = filtered.map(d => get(d, 'putVanna', 'put_vanna'));
+                const callVals = filtered.map(d => get(d, 'callVanna', 'call_vanna'));
+                allBarValues = [...putVals, ...callVals];
+                addBar('Put Vanna', normalize(putVals), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
+                addBar('Call Vanna', normalize(callVals), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
             } else {
-                addBar('Net Vanna', filtered.map(d => get(d, 'totalVanna', 'total_vanna')), 'hsla(25, 95%, 53%, 0.30)', 'hsla(25, 95%, 53%, 0.90)');
+                const netVals = filtered.map(d => get(d, 'totalVanna', 'total_vanna'));
+                allBarValues = netVals;
+                addBar('Net Vanna', normalize(netVals), 'hsla(25, 95%, 53%, 0.30)', 'hsla(25, 95%, 53%, 0.90)');
             }
-            if (showNet) addLine('Cumulative Vanna', smooth(filtered.map(d => get(d, 'totalVanna', 'total_vanna')), sw), COLORS.vanna, true);
+            if (showNet) {
+                const cumVals = smooth(filtered.map(d => get(d, 'totalVanna', 'total_vanna')), sw);
+                addLine('Cumulative Vanna', normalize(cumVals), COLORS.vanna, true);
+            }
         }
 
         if (series === 'charm') {
             if (showSplit) {
-                addBar('Put Charm', filtered.map(d => get(d, 'putCharm', 'put_charm')), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
-                addBar('Call Charm', filtered.map(d => get(d, 'callCharm', 'call_charm')), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
+                const putVals = filtered.map(d => get(d, 'putCharm', 'put_charm'));
+                const callVals = filtered.map(d => get(d, 'callCharm', 'call_charm'));
+                allBarValues = [...putVals, ...callVals];
+                addBar('Put Charm', normalize(putVals), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
+                addBar('Call Charm', normalize(callVals), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
             } else {
-                addBar('Net Charm', filtered.map(d => get(d, 'totalCharm', 'total_charm')), 'hsla(199, 89%, 48%, 0.30)', 'hsla(199, 89%, 48%, 0.90)');
+                const netVals = filtered.map(d => get(d, 'totalCharm', 'total_charm'));
+                allBarValues = netVals;
+                addBar('Net Charm', normalize(netVals), 'hsla(199, 89%, 48%, 0.30)', 'hsla(199, 89%, 48%, 0.90)');
             }
-            if (showNet) addLine('Cumulative Charm', smooth(filtered.map(d => get(d, 'totalCharm', 'total_charm')), sw), COLORS.charm, true);
+            if (showNet) {
+                const cumVals = smooth(filtered.map(d => get(d, 'totalCharm', 'total_charm')), sw);
+                addLine('Cumulative Charm', normalize(cumVals), COLORS.charm, true);
+            }
         }
 
         if (series === 'oi') {
-            addBar('Call OI', filtered.map(d => get(d, 'callOI', 'call_oi')), 'hsla(142, 71%, 45%, 0.45)', 'hsla(142, 71%, 45%, 0.65)');
-            addBar('Put OI', filtered.map(d => get(d, 'putOI', 'put_oi')), 'hsla(0, 72%, 51%, 0.45)', 'hsla(0, 72%, 51%, 0.65)');
-            if (showNet) addLine('Total OI', smooth(filtered.map(d => get(d, 'totalOI', 'total_oi')), sw), COLORS.oi);
+            const callVals = filtered.map(d => get(d, 'callOI', 'call_oi'));
+            const putVals = filtered.map(d => get(d, 'putOI', 'put_oi'));
+            allBarValues = [...callVals, ...putVals];
+            addBar('Call OI', normalize(callVals), 'hsla(142, 71%, 45%, 0.45)', 'hsla(142, 71%, 45%, 0.65)');
+            addBar('Put OI', normalize(putVals), 'hsla(0, 72%, 51%, 0.45)', 'hsla(0, 72%, 51%, 0.65)');
+            if (showNet) {
+                const totVals = smooth(filtered.map(d => get(d, 'totalOI', 'total_oi')), sw);
+                addLine('Total OI', normalize(totVals), COLORS.oi);
+            }
         }
 
         if (series === 'iv') {
@@ -180,7 +241,7 @@ const ChartBuilder = (function() {
             }
         }
 
-        return { datasets, labels, filtered };
+        return { datasets, labels, filtered, allBarValues };
     }
 
     function buildAnnotations(filtered, levels, spotPrice) {
@@ -251,8 +312,10 @@ const ChartBuilder = (function() {
         if (!ctx) return;
         if (chartInstance) chartInstance.destroy();
 
-        const { datasets, labels, filtered } = buildDatasets(data, spotPrice, series);
+        const { datasets, labels, filtered, allBarValues } = buildDatasets(data, spotPrice, series);
         const annotations = buildAnnotations(filtered, currentLevels, spotPrice);
+
+        const maxAbsBar = Math.max(...allBarValues.map(Math.abs));
 
         const legendEl = document.getElementById('chartLegend');
         if (legendEl) {
@@ -285,7 +348,8 @@ const ChartBuilder = (function() {
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
+                // FIX: Use 'nearest' instead of 'index' to avoid magnet jumping between datasets on same Y
+                interaction: { mode: 'index', intersect: false, axis: 'y' },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -300,10 +364,15 @@ const ChartBuilder = (function() {
                         bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
                         callbacks: {
                             title: (items) => 'Strike: $' + items[0].label,
-                            label: (item) => item.dataset.label + ': ' + fmt(item.raw)
+                            label: (item) => {
+                                const normVal = item.raw;
+                                const rawVal = normVal * maxAbsBar;
+                                return item.dataset.label + ': ' + (normVal * 100).toFixed(1) + '% (raw: ' + fmt(rawVal) + ')';
+                            }
                         }
                     },
                     annotation: { annotations }
+                    // NO zoom plugin - removed
                 },
                 scales: {
                     y: {
@@ -316,8 +385,14 @@ const ChartBuilder = (function() {
                         display: true,
                         position: 'bottom',
                         grid: { color: COLORS.grid, drawBorder: false },
-                        ticks: { color: COLORS.text, font: { family: "'JetBrains Mono', monospace", size: 9 }, callback: (val) => fmt(val) },
-                        border: { display: false }
+                        ticks: { 
+                            color: COLORS.text, 
+                            font: { family: "'JetBrains Mono', monospace", size: 9 }, 
+                            callback: (val) => (val * 100).toFixed(0) + '%'
+                        },
+                        border: { display: false },
+                        min: -1.1,
+                        max: 1.1
                     }
                 },
                 animation: { duration: 300, easing: 'easeOutQuart' }

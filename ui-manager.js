@@ -3,7 +3,6 @@
 const UIManager = (function() {
     'use strict';
 
-    // Hedge fund favorites + major indices
     const TICKER_PRESETS = {
         equity: ['SPY', 'QQQ', 'IWM', 'TSLA', 'NVDA', 'AAPL', 'META', 'AMZN', 'GOOGL', 'MSFT', 'AMD', 'NFLX', 'PLTR', 'HOOD', 'MSTR', 'SMCI', 'AVGO', 'JPM', 'BAC', 'XOM', 'UNH', 'V', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'LLY', 'WMT', 'DIS'],
         index: ['^SPX', '^NDX', '^RUT', '^VIX', '^DJI', '^IXIC', '^FTSE', '^N225', '^HSI', '^GSPC', '^GSPTSE', '^AORD', '^BSESN', '^JKSE', '^KLSE', '^NZ50', '^STI', '^TWII', '^N100', '^OMX'],
@@ -12,20 +11,6 @@ const UIManager = (function() {
 
     let currentAssetClass = 'equity';
     let sidebarOpen = false;
-    let settingsOpen = false;
-
-    // Default theme values
-    const DEFAULT_THEME = {
-        bg: '#0a0a0a',
-        card: '#0f0f0f',
-        text: '#fafafa',
-        muted: '#a3a3a3',
-        positive: '#22c55e',
-        negative: '#ef4444',
-        aggregate: '#8b5cf6',
-        net: '#f59e0b',
-        spot: '#3b82f6'
-    };
 
     function formatDate(timestamp) {
         if (typeof timestamp === 'string' && timestamp.includes('-')) {
@@ -74,140 +59,6 @@ const UIManager = (function() {
         if (sidebar) sidebar.classList.toggle('open', sidebarOpen);
     }
 
-    function toggleSettings() {
-        settingsOpen = !settingsOpen;
-        const panel = document.getElementById('settingsPanel');
-        const overlay = document.getElementById('settingsOverlay');
-        if (panel) panel.classList.toggle('open', settingsOpen);
-        if (overlay) overlay.classList.toggle('open', settingsOpen);
-    }
-
-    function hexToHsl(hex) {
-        let r = parseInt(hex.slice(1, 3), 16) / 255;
-        let g = parseInt(hex.slice(3, 5), 16) / 255;
-        let b = parseInt(hex.slice(5, 7), 16) / 255;
-        const max = Math.max(r, g, b), min = Math.min(r, g, b);
-        let h, s, l = (max + min) / 2;
-        if (max === min) { h = s = 0; }
-        else {
-            const d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-                case g: h = ((b - r) / d + 2) / 6; break;
-                case b: h = ((r - g) / d + 4) / 6; break;
-            }
-        }
-        return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
-    }
-
-    function updateTheme() {
-        const bg = document.getElementById('bgColor')?.value || DEFAULT_THEME.bg;
-        const card = document.getElementById('cardColor')?.value || DEFAULT_THEME.card;
-        const text = document.getElementById('textColor')?.value || DEFAULT_THEME.text;
-        const muted = document.getElementById('mutedColor')?.value || DEFAULT_THEME.muted;
-        const positive = document.getElementById('positiveColor')?.value || DEFAULT_THEME.positive;
-        const negative = document.getElementById('negativeColor')?.value || DEFAULT_THEME.negative;
-        const aggregate = document.getElementById('aggregateColor')?.value || DEFAULT_THEME.aggregate;
-        const net = document.getElementById('netColor')?.value || DEFAULT_THEME.net;
-        const spot = document.getElementById('spotColor')?.value || DEFAULT_THEME.spot;
-
-        const root = document.documentElement;
-        const bgHsl = hexToHsl(bg);
-        const cardHsl = hexToHsl(card);
-        const textHsl = hexToHsl(text);
-        const mutedHsl = hexToHsl(muted);
-        const posHsl = hexToHsl(positive);
-        const negHsl = hexToHsl(negative);
-        const aggHsl = hexToHsl(aggregate);
-        const netHsl = hexToHsl(net);
-        const spotHsl = hexToHsl(spot);
-
-        root.style.setProperty('--background', `hsl(${bgHsl.h} ${bgHsl.s}% ${bgHsl.l}%)`);
-        root.style.setProperty('--card', `hsl(${cardHsl.h} ${cardHsl.s}% ${cardHsl.l}%)`);
-        root.style.setProperty('--foreground', `hsl(${textHsl.h} ${textHsl.s}% ${textHsl.l}%)`);
-        root.style.setProperty('--muted-foreground', `hsl(${mutedHsl.h} ${mutedHsl.s}% ${mutedHsl.l}%)`);
-        root.style.setProperty('--chart-positive', `hsl(${posHsl.h} ${posHsl.s}% ${posHsl.l}%)`);
-        root.style.setProperty('--chart-positive-soft', `hsl(${posHsl.h} ${posHsl.s}% ${posHsl.l}% / 0.15)`);
-        root.style.setProperty('--chart-negative', `hsl(${negHsl.h} ${negHsl.s}% ${negHsl.l}%)`);
-        root.style.setProperty('--chart-negative-soft', `hsl(${negHsl.h} ${negHsl.s}% ${negHsl.l}% / 0.15)`);
-        root.style.setProperty('--chart-accent', `hsl(${aggHsl.h} ${aggHsl.s}% ${aggHsl.l}%)`);
-        root.style.setProperty('--chart-accent-soft', `hsl(${aggHsl.h} ${aggHsl.s}% ${aggHsl.l}% / 0.15)`);
-        root.style.setProperty('--chart-warn', `hsl(${netHsl.h} ${netHsl.s}% ${netHsl.l}%)`);
-        root.style.setProperty('--chart-warn-soft', `hsl(${netHsl.h} ${netHsl.s}% ${netHsl.l}% / 0.15)`);
-        root.style.setProperty('--chart-neutral', `hsl(${spotHsl.h} ${spotHsl.s}% ${spotHsl.l}%)`);
-        root.style.setProperty('--chart-neutral-soft', `hsl(${spotHsl.h} ${spotHsl.s}% ${spotHsl.l}% / 0.15)`);
-
-        // Save to localStorage
-        localStorage.setItem('gex-theme', JSON.stringify({ bg, card, text, muted, positive, negative, aggregate, net, spot }));
-    }
-
-    function resetTheme() {
-        document.getElementById('bgColor').value = DEFAULT_THEME.bg;
-        document.getElementById('cardColor').value = DEFAULT_THEME.card;
-        document.getElementById('textColor').value = DEFAULT_THEME.text;
-        document.getElementById('mutedColor').value = DEFAULT_THEME.muted;
-        document.getElementById('positiveColor').value = DEFAULT_THEME.positive;
-        document.getElementById('negativeColor').value = DEFAULT_THEME.negative;
-        document.getElementById('aggregateColor').value = DEFAULT_THEME.aggregate;
-        document.getElementById('netColor').value = DEFAULT_THEME.net;
-        document.getElementById('spotColor').value = DEFAULT_THEME.spot;
-        updateTheme();
-        localStorage.removeItem('gex-theme');
-    }
-
-    function loadTheme() {
-        const saved = localStorage.getItem('gex-theme');
-        if (saved) {
-            try {
-                const theme = JSON.parse(saved);
-                document.getElementById('bgColor').value = theme.bg;
-                document.getElementById('cardColor').value = theme.card;
-                document.getElementById('textColor').value = theme.text;
-                document.getElementById('mutedColor').value = theme.muted;
-                document.getElementById('positiveColor').value = theme.positive;
-                document.getElementById('negativeColor').value = theme.negative;
-                document.getElementById('aggregateColor').value = theme.aggregate;
-                document.getElementById('netColor').value = theme.net;
-                document.getElementById('spotColor').value = theme.spot;
-                updateTheme();
-            } catch (e) { /* ignore */ }
-        }
-    }
-
-    function updateChartHeight() {
-        const val = document.getElementById('chartHeight')?.value || 680;
-        document.getElementById('chartHeightVal').textContent = val + 'px';
-        const container = document.getElementById('chartContainer');
-        if (container) container.style.height = val + 'px';
-        localStorage.setItem('gex-chart-height', val);
-    }
-
-    function loadChartHeight() {
-        const saved = localStorage.getItem('gex-chart-height');
-        if (saved) {
-            document.getElementById('chartHeight').value = Math.max(saved, 900);
-            updateChartHeight();
-        }
-    }
-
-    function updateSmoothing() {
-        const val = document.getElementById('lineSmoothing')?.value || 7;
-        document.getElementById('lineSmoothingVal').textContent = val;
-        localStorage.setItem('gex-smoothing', val);
-        if (window.chart && window.chart.render && currentData && currentSpot) {
-            window.chart.render(currentData, currentSpot, activeSeries);
-        }
-    }
-
-    function loadSmoothing() {
-        const saved = localStorage.getItem('gex-smoothing');
-        if (saved) {
-            document.getElementById('lineSmoothing').value = saved;
-            updateSmoothing();
-        }
-    }
-
     function switchAssetClass(cls) {
         currentAssetClass = cls;
         document.querySelectorAll('.asset-tab').forEach(tab => {
@@ -249,7 +100,6 @@ const UIManager = (function() {
         }
         list.innerHTML = expirations.slice(0, 20).map(exp => {
             const isSelected = exp === selectedExp;
-            const expQuoted = JSON.stringify(exp);
             return `
                 <div class="exp-item ${isSelected ? 'selected' : ''}" data-exp="${exp}" onclick="ui.selectExp(this)">
                     <span>${formatDate(exp)}</span>
@@ -306,8 +156,8 @@ const UIManager = (function() {
         if (!bar) return;
         bar.style.display = 'grid';
 
-        const priceEl = document.getElementById('statPrice');
-        const changeEl = document.getElementById('statChange');
+        const inflectionEl = document.getElementById('statInflection');
+        const inflectionDescEl = document.getElementById('statInflectionDesc');
         const zoneEl = document.getElementById('statZone');
         const zoneDescEl = document.getElementById('statZoneDesc');
         const totalGEXEl = document.getElementById('statTotalGEX');
@@ -315,31 +165,33 @@ const UIManager = (function() {
         const callWallEl = document.getElementById('statCallWall');
         const putWallEl = document.getElementById('statPutWall');
 
-        const change = quote.change !== undefined ? quote.change : 0;
-        const changePercent = quote.change_percent !== undefined ? quote.change_percent : (quote.changePercent || 0);
         const isPositiveGamma = levels.is_positive_gamma !== undefined ? levels.is_positive_gamma : levels.isPositiveGamma;
         const totalGEX = levels.total_gex !== undefined ? levels.total_gex : levels.totalGEX;
         const callWall = levels.call_wall !== undefined ? levels.call_wall : levels.callWall;
         const putWall = levels.put_wall !== undefined ? levels.put_wall : levels.putWall;
+        const inflection = levels.inflection !== undefined ? levels.inflection : levels.inflection;
+        const spotPrice = quote.price;
 
-        if (priceEl) priceEl.textContent = formatPrice(quote.price);
-        if (changeEl) {
-            changeEl.textContent = `${change >= 0 ? '+' : ''}${formatPrice(change)} (${formatPercent(changePercent)})`;
-            changeEl.className = `price-change ${change >= 0 ? 'up' : 'down'}`;
+        if (inflectionEl) {
+            inflectionEl.textContent = formatPrice(inflection);
+            const dist = spotPrice - inflection;
+            if (inflectionDescEl) {
+                inflectionDescEl.textContent = `${dist >= 0 ? '+' : ''}${formatPrice(dist)} from spot`;
+            }
         }
         if (zoneEl) {
             if (isPositiveGamma) {
                 zoneEl.textContent = 'Positive';
                 zoneEl.style.color = 'var(--chart-positive)';
-                if (zoneDescEl) zoneDescEl.textContent = 'Stabilizing / Mean-reverting';
+                if (zoneDescEl) zoneDescEl.textContent = 'Stabilizing';
             } else {
                 zoneEl.textContent = 'Negative';
                 zoneEl.style.color = 'var(--chart-negative)';
-                if (zoneDescEl) zoneDescEl.textContent = 'Amplifying / Trending';
+                if (zoneDescEl) zoneDescEl.textContent = 'Amplifying';
             }
         }
         if (totalGEXEl) totalGEXEl.textContent = formatNumber(totalGEX);
-        if (totalGEXDescEl) totalGEXDescEl.textContent = totalGEX > 0 ? 'Net Long Gamma' : 'Net Short Gamma';
+        if (totalGEXDescEl) totalGEXDescEl.textContent = totalGEX > 0 ? 'Net Long' : 'Net Short';
         if (callWallEl) callWallEl.textContent = formatPrice(callWall);
         if (putWallEl) putWallEl.textContent = formatPrice(putWall);
     }
@@ -487,9 +339,6 @@ const UIManager = (function() {
 
     function init() {
         renderTickerGrid(TICKER_PRESETS.equity);
-        loadTheme();
-        loadChartHeight();
-        loadSmoothing();
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
             const toggle = document.getElementById('mobileNavToggle');
@@ -507,11 +356,11 @@ const UIManager = (function() {
     }
 
     return {
-        init, toggleSidebar, toggleSettings, switchAssetClass, selectTicker, renderTickerGrid,
+        init, toggleSidebar, switchAssetClass, selectTicker, renderTickerGrid,
         renderExpirations, selectExp, renderKeyLevels, renderPriceBar,
         updateRegimeBadge, renderGreeksPanel, renderRegimeAnalysis,
         showLoading, hideLoading, updateChartTitle, updateLastUpdate,
-        setGenerateEnabled, showError, updateTheme, resetTheme, updateChartHeight, updateSmoothing,
+        setGenerateEnabled, showError,
         formatDate, formatDaysLeft, formatPrice, formatNumber, formatPercent,
         TICKER_PRESETS
     };

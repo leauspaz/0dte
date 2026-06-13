@@ -186,14 +186,14 @@ body { background: var(--background); color: var(--foreground); font-family: var
 
 /* ===== PRICE BAR ===== */
 .price-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-3); }
-.price-stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4); text-align: center; transition: all 0.15s ease; }
+.price-stat { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-3) var(--space-2); text-align: center; transition: all 0.15s ease; }
 .price-stat:hover { border-color: var(--ring); }
-.price-label { font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; margin-bottom: var(--space-2); }
-.price-value { font-size: 20px; font-weight: 700; font-family: var(--font-mono); line-height: 1.2; color: var(--foreground); letter-spacing: -0.02em; }
-.price-change { font-size: 11px; font-weight: 600; margin-top: 4px; font-family: var(--font-mono); }
+.price-label { font-size: 9px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; margin-bottom: 2px; }
+.price-value { font-size: 16px; font-weight: 700; font-family: var(--font-mono); line-height: 1.2; color: var(--foreground); letter-spacing: -0.02em; }
+.price-change { font-size: 10px; font-weight: 600; margin-top: 2px; font-family: var(--font-mono); }
 .price-change.up { color: var(--chart-positive); }
 .price-change.down { color: var(--chart-negative); }
-.price-desc { font-size: 11px; color: var(--muted-foreground); margin-top: 4px; font-weight: 500; }
+.price-desc { font-size: 10px; color: var(--muted-foreground); margin-top: 2px; font-weight: 500; }
 
 /* ===== CHART CARD ===== */
 .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; position: relative; }
@@ -269,8 +269,10 @@ body { background: var(--background); color: var(--foreground); font-family: var
     .sidebar { position: static; display: none; }
     .sidebar.open { display: flex; }
     .mobile-nav-toggle { display: flex; }
-    .price-bar { grid-template-columns: repeat(3, 1fr); }
-    .greeks-panel { grid-template-columns: repeat(2, 1fr); }
+    .price-bar { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .price-stat { padding: 8px 4px; }
+    .price-value { font-size: 14px; }
+    .greeks-panel { grid-template-columns: repeat(3, 1fr); }
     .chart-controls-bar { gap: var(--space-3); }
     .settings-panel { width: 300px; right: -320px; }
 }
@@ -280,25 +282,60 @@ body { background: var(--background); color: var(--foreground); font-family: var
     .brand { font-size: 16px; }
     .tagline { display: none; }
     .main-layout { padding: var(--space-3); gap: var(--space-3); }
-    .price-bar { grid-template-columns: repeat(2, 1fr); }
-    .price-value { font-size: 16px; }
+    .price-bar { 
+        grid-template-columns: repeat(5, 1fr); 
+        gap: 4px;
+    }
+    .price-stat { padding: 6px 4px; }
+    .price-label { font-size: 8px; }
+    .price-value { font-size: 13px; }
+    .price-desc { font-size: 9px; display: none; } /* Hide descriptions on mobile */
     .chart-header { flex-direction: column; gap: var(--space-3); }
-    .chart-container { height: 900px; }
-    .greeks-panel { grid-template-columns: 1fr; }
-    .greek-value { font-size: 18px; }
-    .ticker-grid { grid-template-columns: repeat(3, 1fr); }
-    .footer { flex-direction: column; text-align: center; gap: var(--space-2); }
-    .series-selector { flex-direction: column; align-items: flex-start; gap: var(--space-2); }
-    .chart-controls-bar { flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+    .chart-container { height: 600px; } /* Smaller chart on mobile */
+    .greeks-panel { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .greek-card { padding: 8px; }
+    .greek-value { font-size: 14px; }
+    .greek-title { font-size: 9px; }
+    .greek-desc { font-size: 9px; }
+    .ticker-grid { grid-template-columns: repeat(4, 1fr); }
+    .footer { flex-direction: column; text-align: center; gap: var(--space-2); font-size: 10px; }
+    .series-selector { padding: var(--space-2) var(--space-3); }
+    .series-tab { padding: 4px 8px; font-size: 10px; }
+    .chart-controls-bar { 
+        padding: var(--space-2) var(--space-3); 
+        gap: 8px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+    .chart-controls-bar::-webkit-scrollbar { display: none; }
+    .toggle { font-size: 10px; flex-shrink: 0; }
+    .toggle-track { width: 24px; height: 14px; }
+    .toggle-thumb { width: 10px; height: 10px; }
+    .toggle input:checked + .toggle-track .toggle-thumb { left: 12px; }
+    .chart-legend { gap: var(--space-3); padding: var(--space-2); }
+    .legend-item { font-size: 10px; }
     .settings-panel { width: 100%; right: -100%; }
 }
 
 @media (max-width: 480px) {
-    .price-bar { grid-template-columns: 1fr; }
-    .chart-container { height: 900px; }
-    .ticker-grid { grid-template-columns: repeat(2, 1fr); }
+    .price-bar { 
+        grid-template-columns: repeat(5, 1fr); 
+        gap: 3px;
+    }
+    .price-stat { padding: 4px 2px; }
+    .price-label { font-size: 7px; letter-spacing: 0; }
+    .price-value { font-size: 11px; }
+    .chart-container { height: 500px; }
+    .ticker-grid { grid-template-columns: repeat(3, 1fr); }
     .asset-tab { padding: 4px 6px; font-size: 9px; }
     .header-right { gap: var(--space-2); }
+    .series-tabs { gap: 2px; }
+    .series-tab { padding: 3px 6px; font-size: 9px; }
+    .chart-controls-bar { gap: 6px; padding: 6px; }
+    .toggle-label { display: none; } /* Hide toggle labels, just show switches */
+    .greeks-panel { grid-template-columns: repeat(2, 1fr); }
+    .greek-value { font-size: 13px; }
 }
 
 /* ===== ERROR MESSAGE ===== */
