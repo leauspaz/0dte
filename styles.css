@@ -219,8 +219,59 @@ body { background: var(--background); color: var(--foreground); font-family: var
 .series-tab:hover { background: var(--accent); border-color: var(--ring); color: var(--foreground); }
 .series-tab.active { background: var(--foreground); border-color: var(--foreground); color: var(--background); }
 
-/* ===== CHART CONTROLS BAR - SIMPLIFIED ===== */
-.chart-controls-bar { display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4); flex-wrap: wrap; border-bottom: 1px solid var(--border); align-items: center; }
+/* ===== CHART CONTROLS BAR ===== */
+.chart-controls-bar { 
+    display: flex; 
+    gap: var(--space-4); 
+    padding: var(--space-3) var(--space-4); 
+    flex-wrap: wrap; 
+    border-bottom: 1px solid var(--border); 
+    align-items: flex-start;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.control-group-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.control-group-items {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.toggle.compact {
+    gap: 4px;
+}
+
+.toggle.compact .toggle-track {
+    width: 24px;
+    height: 14px;
+}
+
+.toggle.compact .toggle-thumb {
+    width: 10px;
+    height: 10px;
+    top: 2px;
+    left: 2px;
+}
+
+.toggle.compact input:checked + .toggle-track .toggle-thumb {
+    left: 12px;
+}
+
+.toggle.compact .toggle-label {
+    font-size: 10px;
+}
 
 /* Toggle Switch */
 .toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: var(--muted-foreground); font-weight: 500; user-select: none; }
@@ -303,16 +354,31 @@ body { background: var(--background); color: var(--foreground); font-family: var
     .series-tab { padding: 4px 8px; font-size: 10px; }
     .chart-controls-bar { 
         padding: var(--space-2) var(--space-3); 
-        gap: 8px;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        scrollbar-width: none;
+        gap: 12px;
+        flex-wrap: wrap;
     }
-    .chart-controls-bar::-webkit-scrollbar { display: none; }
-    .toggle { font-size: 10px; flex-shrink: 0; }
-    .toggle-track { width: 24px; height: 14px; }
-    .toggle-thumb { width: 10px; height: 10px; }
-    .toggle input:checked + .toggle-track .toggle-thumb { left: 12px; }
+    .control-group-label {
+        font-size: 8px;
+    }
+    .control-group-items {
+        gap: 6px;
+    }
+    .toggle.compact .toggle-label {
+        font-size: 9px;
+    }
+    .toggle.compact .toggle-track {
+        width: 22px;
+        height: 12px;
+    }
+    .toggle.compact .toggle-thumb {
+        width: 8px;
+        height: 8px;
+        top: 2px;
+        left: 2px;
+    }
+    .toggle.compact input:checked + .toggle-track .toggle-thumb {
+        left: 12px;
+    }
     .chart-legend { gap: var(--space-3); padding: var(--space-2); }
     .legend-item { font-size: 10px; }
     .settings-panel { width: 100%; right: -100%; }
@@ -333,7 +399,12 @@ body { background: var(--background); color: var(--foreground); font-family: var
     .series-tabs { gap: 2px; }
     .series-tab { padding: 3px 6px; font-size: 9px; }
     .chart-controls-bar { gap: 6px; padding: 6px; }
-    .toggle-label { display: none; } /* Hide toggle labels, just show switches */
+    .control-group-items {
+        gap: 5px;
+    }
+    .toggle.compact .toggle-label {
+        font-size: 8px;
+    }
     .greeks-panel { grid-template-columns: repeat(2, 1fr); }
     .greek-value { font-size: 13px; }
 }

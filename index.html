@@ -187,43 +187,53 @@
                         </div>
                     </div>
 
-                    <!-- Simplified Chart Controls -->
+                    <!-- Chart Controls -->
                     <div class="chart-controls-bar">
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleAggregate" checked onchange="chart.toggleElement('aggregate')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Aggregate</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleNet" onchange="chart.toggleElement('net')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Cumulative</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleSplit" onchange="chart.toggleElement('split')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Split C/P</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleCallWall" checked onchange="chart.toggleElement('callWall')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Call Wall</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="togglePutWall" checked onchange="chart.toggleElement('putWall')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Put Wall</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleInflection" checked onchange="chart.toggleElement('inflection')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Inflection</span>
-                        </label>
-                        <label class="toggle">
-                            <input type="checkbox" id="toggleSpot" checked onchange="chart.toggleElement('spot')">
-                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                            <span class="toggle-label">Spot Price</span>
-                        </label>
+                        <div class="control-group">
+                            <span class="control-group-label">Lines</span>
+                            <div class="control-group-items">
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleAggregate" checked onchange="chart.toggleElement('aggregate')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Agg</span>
+                                </label>
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleNet" onchange="chart.toggleElement('net')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Cum</span>
+                                </label>
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleSplit" onchange="chart.toggleElement('split')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Split</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="control-group">
+                            <span class="control-group-label">Levels</span>
+                            <div class="control-group-items">
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleCallWall" checked onchange="chart.toggleElement('callWall')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Call</span>
+                                </label>
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="togglePutWall" checked onchange="chart.toggleElement('putWall')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Put</span>
+                                </label>
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleInflection" checked onchange="chart.toggleElement('inflection')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Flip</span>
+                                </label>
+                                <label class="toggle compact">
+                                    <input type="checkbox" id="toggleSpot" checked onchange="chart.toggleElement('spot')">
+                                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                                    <span class="toggle-label">Spot</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="chart-legend" id="chartLegend"></div>
