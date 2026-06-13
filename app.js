@@ -1,192 +1,124 @@
 /* ===== APP =====
- * Main application entry point. Wires together all modules.
+ * 0DTE GEX Analyzer — connects to local Python backend
  */
 
 const App = (function() {
     'use strict';
 
-    // ===== STATE =====
     let currentTicker = 'SPY';
     let currentExp = null;
     let expirations = [];
     let quoteData = null;
     let gexData = null;
     let levels = null;
-    let isDemo = false;
 
-    // Expose state for chart builder
-    window.appState = { spotPrice: 0 };
+    window.appState = { spotPrice: 0, activeSeries: 'gex' };
 
-    // ===== SEARCH TICKER =====
+    function init() {
+        if (window.ui && window.ui.init) window.ui.init();
+        searchTicker();
+    }
+
     async function searchTicker() {
         const input = document.getElementById('tickerInput');
         const ticker = input?.value?.toUpperCase().trim();
         if (!ticker) return;
 
         currentTicker = ticker;
-        isDemo = false;
-
         ui.showLoading();
         ui.setGenerateEnabled(false);
 
         try {
-            // Fetch quote
-            quoteData = await YahooClient.fetchQuote(ticker);
+            quoteData = await APIClient.getQuote(ticker);
             window.appState.spotPrice = quoteData.price;
 
-            // Fetch options chain for expirations
-            const chain = await YahooClient.fetchOptionsChain(ticker);
-            expirations = chain.expirationDates || [];
+            const expData = await APIClient.getExpirations(ticker);
+            expirations = expData.expirations || [];
 
             if (expirations.length === 0) {
-                throw new Error('No options data available for this ticker. This may be a futures, crypto, or FX ticker that does not have options chains on Yahoo Finance.');
+                throw new Error('No options expirations found for this ticker.');
             }
 
-            // Select first expiration
             currentExp = expirations[0];
-
-            // Render expirations
             ui.renderExpirations(expirations, currentExp);
             ui.setGenerateEnabled(true);
             ui.updateLastUpdate();
 
-            // Auto-generate
             await generateGEX();
 
         } catch (err) {
             console.error('Search error:', err);
-            ui.showError(err.message, 'app.searchTicker');
+            ui.showError(err.message + '<br><br>Make sure the Python server is running (python main.py)');
             ui.hideLoading();
         }
     }
 
-    // ===== GENERATE GEX =====
     async function generateGEX() {
         if (!currentExp) return;
-
         ui.showLoading();
 
         try {
-            let chain;
-            let calcResult;
+            const result = await APIClient.getGEX(currentTicker, currentExp);
 
-            if (isDemo) {
-                // Use demo data
-                const demo = YahooClient.getDemoData();
-                calcResult = { data: demo.data, summary: demo.summary };
-                quoteData = demo.quote;
-                window.appState.spotPrice = quoteData.price;
-            } else {
-                // Fetch options for selected expiration
-                chain = await YahooClient.fetchOptionsChain(currentTicker, currentExp);
+            gexData = result.data;
+            levels = result.levels;
+            levels.spot_price = result.quote.price;
+            quoteData = result.quote;
 
-                if (!chain.options || chain.options.length === 0) {
-                    throw new Error('No options data for this expiration');
-                }
-
-                // Calculate all Greeks
-                calcResult = GreekEngine.calculateAllGreeks(chain, quoteData.price);
+            // Pass levels to chart builder for annotations
+            if (window.chart && window.chart.setLevels) {
+                window.chart.setLevels(levels);
             }
 
-            gexData = calcResult.data;
-
-            // Find key levels
-            levels = GreekEngine.findKeyLevels(gexData, quoteData.price);
-            levels.spotPrice = quoteData.price;
-
-            // Update UI
-            ui.renderKeyLevels(levels);
-            ui.renderPriceBar(quoteData, levels);
-            ui.updateRegimeBadge(levels.isPositiveGamma);
-            ui.renderGreeksPanel(levels, calcResult.summary);
-            ui.renderRegimeAnalysis(levels, quoteData);
-            ui.updateChartTitle(currentTicker, currentExp);
-            ui.updateLastUpdate();
-
-            // Render chart with default series
-            const series = ChartBuilder.activeSeries();
-            ChartBuilder.render(gexData, quoteData.price, series);
+            renderAll(result.summary);
 
         } catch (err) {
             console.error('Generate error:', err);
-            ui.showError(err.message + '<br><br>Try switching CORS proxy or clicking "Load Demo Data".', 'app.generateGEX');
+            ui.showError(err.message);
         } finally {
             ui.hideLoading();
         }
     }
 
-    // ===== LOAD DEMO DATA =====
-    function loadDemo() {
-        isDemo = true;
-        currentTicker = 'SPX';
-        document.getElementById('tickerInput').value = 'SPX';
-
-        const demo = YahooClient.getDemoData();
-        gexData = demo.data;
-        quoteData = demo.quote;
-        window.appState.spotPrice = quoteData.price;
-
-        // Fake expirations
-        expirations = [Math.floor(Date.now() / 1000) + 86400 * 7];
-        currentExp = expirations[0];
-        ui.renderExpirations(expirations, currentExp);
-        ui.setGenerateEnabled(true);
-
-        // Calculate levels from demo data
-        levels = GreekEngine.findKeyLevels(gexData, quoteData.price);
-        levels.spotPrice = quoteData.price;
-
-        // Update UI
+    function renderAll(summary) {
         ui.renderKeyLevels(levels);
         ui.renderPriceBar(quoteData, levels);
-        ui.updateRegimeBadge(levels.isPositiveGamma);
-        ui.renderGreeksPanel(levels, demo.summary);
+        ui.updateRegimeBadge(levels.is_positive_gamma);
+        ui.renderGreeksPanel(levels, summary);
         ui.renderRegimeAnalysis(levels, quoteData);
-        ui.updateChartTitle('SPX (Demo)', currentExp);
+        ui.updateChartTitle(currentTicker, currentExp);
         ui.updateLastUpdate();
 
-        // Render chart
-        const series = ChartBuilder.activeSeries();
-        ChartBuilder.render(gexData, quoteData.price, series);
+        // Use single-series mode from chart builder
+        const series = window.chart ? window.chart.activeSeries() : 'gex';
+        if (window.chart && window.chart.render) {
+            window.chart.render(gexData, quoteData.price, series);
+        }
     }
 
-    // ===== SET EXPIRATION =====
     function setExp(timestamp) {
         currentExp = timestamp;
     }
 
-    // ===== REFRESH =====
     async function refresh() {
-        if (!currentExp) {
-            await searchTicker();
-        } else {
+        if (currentExp) {
             await generateGEX();
+        } else {
+            await searchTicker();
         }
     }
 
-    // ===== INIT =====
-    function init() {
-        ui.init();
-
-        // Load initial ticker
-        searchTicker();
-    }
-
-    // ===== PUBLIC API =====
     return {
         init,
         searchTicker,
         generateGEX,
-        loadDemo,
         setExp,
         refresh
     };
 })();
 
-// Expose to window for HTML onclick handlers
 window.app = App;
 
-// Start when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     App.init();
 });

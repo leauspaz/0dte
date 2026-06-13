@@ -1,44 +1,61 @@
-/* ===== UI MANAGER =====
- * Handles all DOM interactions, mobile navigation, ticker grids, 
- * key levels display, greeks panel, and regime analysis
- */
+/* ===== UI MANAGER ===== */
 
 const UIManager = (function() {
     'use strict';
 
-    // ===== TICKER PRESETS =====
+    // Hedge fund favorites + major indices
     const TICKER_PRESETS = {
-        equity: ['SPY', 'SPX', 'QQQ', 'IWM', 'VIX', 'TSLA', 'NVDA', 'AAPL', 'META', 'AMZN', 'GOOGL', 'MSFT', 'AMD', 'COIN', 'NFLX', 'PLTR', 'HOOD', 'MSTR', 'SMCI', 'AVGO'],
-        etf: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE', 'XLU', 'XLI', 'XLP', 'XLB', 'XRT', 'XHB', 'KRE', 'SMH', 'SOXX', 'IBB', 'XBI', 'ARKK', 'TLT'],
-        futures: ['ES=F', 'NQ=F', 'YM=F', 'RTY=F', 'GC=F', 'SI=F', 'CL=F', 'NG=F', 'ZB=F', 'ZN=F', 'ZW=F', 'ZC=F', 'ZS=F', 'KC=F', 'CT=F', 'CC=F', 'SB=F', 'HG=F', 'PA=F', 'PL=F'],
-        crypto: ['BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD', 'ADA-USD', 'DOGE-USD', 'DOT-USD', 'AVAX-USD', 'LINK-USD', 'MATIC-USD', 'LTC-USD', 'BCH-USD', 'UNI-USD', 'ETC-USD', 'XLM-USD', 'ALGO-USD', 'FIL-USD', 'ATOM-USD', 'NEAR-USD', 'ICP-USD'],
-        fx: ['EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'AUDUSD=X', 'USDCAD=X', 'USDCHF=X', 'NZDUSD=X', 'EURGBP=X', 'EURJPY=X', 'GBPJPY=X', 'USDCNH=X', 'USDSEK=X', 'USDNOK=X', 'USDMXN=X', 'USDZAR=X', 'USDBRL=X', 'USDTRY=X', 'USDKRW=X', 'USDSGD=X', 'USDHKD=X'],
-        commodity: ['GC=F', 'SI=F', 'CL=F', 'NG=F', 'HG=F', 'PA=F', 'PL=F', 'ALI=F', 'ZW=F', 'ZC=F', 'ZS=F', 'KC=F', 'CT=F', 'CC=F', 'SB=F', 'LB=F', 'OJ=F']
+        equity: ['SPY', 'QQQ', 'IWM', 'TSLA', 'NVDA', 'AAPL', 'META', 'AMZN', 'GOOGL', 'MSFT', 'AMD', 'NFLX', 'PLTR', 'HOOD', 'MSTR', 'SMCI', 'AVGO', 'JPM', 'BAC', 'XOM', 'UNH', 'V', 'PG', 'MA', 'HD', 'CVX', 'MRK', 'LLY', 'WMT', 'DIS'],
+        index: ['^SPX', '^NDX', '^RUT', '^VIX', '^DJI', '^IXIC', '^FTSE', '^N225', '^HSI', '^GSPC', '^GSPTSE', '^AORD', '^BSESN', '^JKSE', '^KLSE', '^NZ50', '^STI', '^TWII', '^N100', '^OMX'],
+        etf: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE', 'XLU', 'XLI', 'XLP', 'XLB', 'XRT', 'XHB', 'KRE', 'SMH', 'SOXX', 'IBB', 'XBI', 'ARKK', 'TLT', 'HYG', 'LQD', 'EFA', 'EEM', 'IEFA', 'VEA', 'VWO', 'VTI', 'VOO', 'QQQM']
     };
 
     let currentAssetClass = 'equity';
     let sidebarOpen = false;
+    let settingsOpen = false;
 
-    // ===== FORMATTERS =====
+    // Default theme values
+    const DEFAULT_THEME = {
+        bg: '#0a0a0a',
+        card: '#0f0f0f',
+        text: '#fafafa',
+        muted: '#a3a3a3',
+        positive: '#22c55e',
+        negative: '#ef4444',
+        aggregate: '#8b5cf6',
+        net: '#f59e0b',
+        spot: '#3b82f6'
+    };
+
     function formatDate(timestamp) {
+        if (typeof timestamp === 'string' && timestamp.includes('-')) {
+            const d = new Date(timestamp + 'T00:00:00');
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
         const d = new Date(timestamp * 1000);
         return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     }
 
     function formatDaysLeft(timestamp) {
-        const days = Math.ceil((timestamp * 1000 - Date.now()) / (1000 * 60 * 60 * 24));
+        let expDate;
+        if (typeof timestamp === 'string' && timestamp.includes('-')) {
+            expDate = new Date(timestamp + 'T00:00:00');
+        } else {
+            expDate = new Date(timestamp * 1000);
+        }
+        const days = Math.ceil((expDate - Date.now()) / (1000 * 60 * 60 * 24));
         if (days <= 0) return 'Today';
         if (days === 1) return '1 day';
         return `${days} days`;
     }
 
     function formatPrice(price) {
-        if (!price && price !== 0) return '--';
+        if (price === null || price === undefined) return '--';
         return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function formatNumber(num) {
-        if (!num && num !== 0) return '--';
+        if (num === null || num === undefined) return '--';
         const abs = Math.abs(num);
         if (abs >= 1000000000) return (num / 1000000000).toFixed(2) + 'B';
         if (abs >= 1000000) return (num / 1000000).toFixed(2) + 'M';
@@ -47,39 +64,162 @@ const UIManager = (function() {
     }
 
     function formatPercent(num) {
-        if (!num && num !== 0) return '--';
+        if (num === null || num === undefined) return '--';
         return (num >= 0 ? '+' : '') + num.toFixed(2) + '%';
     }
 
-    // ===== SIDEBAR TOGGLE =====
     function toggleSidebar() {
         sidebarOpen = !sidebarOpen;
         const sidebar = document.getElementById('sidebar');
-        if (sidebar) {
-            sidebar.classList.toggle('open', sidebarOpen);
+        if (sidebar) sidebar.classList.toggle('open', sidebarOpen);
+    }
+
+    function toggleSettings() {
+        settingsOpen = !settingsOpen;
+        const panel = document.getElementById('settingsPanel');
+        const overlay = document.getElementById('settingsOverlay');
+        if (panel) panel.classList.toggle('open', settingsOpen);
+        if (overlay) overlay.classList.toggle('open', settingsOpen);
+    }
+
+    function hexToHsl(hex) {
+        let r = parseInt(hex.slice(1, 3), 16) / 255;
+        let g = parseInt(hex.slice(3, 5), 16) / 255;
+        let b = parseInt(hex.slice(5, 7), 16) / 255;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        let h, s, l = (max + min) / 2;
+        if (max === min) { h = s = 0; }
+        else {
+            const d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            switch (max) {
+                case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                case g: h = ((b - r) / d + 2) / 6; break;
+                case b: h = ((r - g) / d + 4) / 6; break;
+            }
+        }
+        return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+    }
+
+    function updateTheme() {
+        const bg = document.getElementById('bgColor')?.value || DEFAULT_THEME.bg;
+        const card = document.getElementById('cardColor')?.value || DEFAULT_THEME.card;
+        const text = document.getElementById('textColor')?.value || DEFAULT_THEME.text;
+        const muted = document.getElementById('mutedColor')?.value || DEFAULT_THEME.muted;
+        const positive = document.getElementById('positiveColor')?.value || DEFAULT_THEME.positive;
+        const negative = document.getElementById('negativeColor')?.value || DEFAULT_THEME.negative;
+        const aggregate = document.getElementById('aggregateColor')?.value || DEFAULT_THEME.aggregate;
+        const net = document.getElementById('netColor')?.value || DEFAULT_THEME.net;
+        const spot = document.getElementById('spotColor')?.value || DEFAULT_THEME.spot;
+
+        const root = document.documentElement;
+        const bgHsl = hexToHsl(bg);
+        const cardHsl = hexToHsl(card);
+        const textHsl = hexToHsl(text);
+        const mutedHsl = hexToHsl(muted);
+        const posHsl = hexToHsl(positive);
+        const negHsl = hexToHsl(negative);
+        const aggHsl = hexToHsl(aggregate);
+        const netHsl = hexToHsl(net);
+        const spotHsl = hexToHsl(spot);
+
+        root.style.setProperty('--background', `hsl(${bgHsl.h} ${bgHsl.s}% ${bgHsl.l}%)`);
+        root.style.setProperty('--card', `hsl(${cardHsl.h} ${cardHsl.s}% ${cardHsl.l}%)`);
+        root.style.setProperty('--foreground', `hsl(${textHsl.h} ${textHsl.s}% ${textHsl.l}%)`);
+        root.style.setProperty('--muted-foreground', `hsl(${mutedHsl.h} ${mutedHsl.s}% ${mutedHsl.l}%)`);
+        root.style.setProperty('--chart-positive', `hsl(${posHsl.h} ${posHsl.s}% ${posHsl.l}%)`);
+        root.style.setProperty('--chart-positive-soft', `hsl(${posHsl.h} ${posHsl.s}% ${posHsl.l}% / 0.15)`);
+        root.style.setProperty('--chart-negative', `hsl(${negHsl.h} ${negHsl.s}% ${negHsl.l}%)`);
+        root.style.setProperty('--chart-negative-soft', `hsl(${negHsl.h} ${negHsl.s}% ${negHsl.l}% / 0.15)`);
+        root.style.setProperty('--chart-accent', `hsl(${aggHsl.h} ${aggHsl.s}% ${aggHsl.l}%)`);
+        root.style.setProperty('--chart-accent-soft', `hsl(${aggHsl.h} ${aggHsl.s}% ${aggHsl.l}% / 0.15)`);
+        root.style.setProperty('--chart-warn', `hsl(${netHsl.h} ${netHsl.s}% ${netHsl.l}%)`);
+        root.style.setProperty('--chart-warn-soft', `hsl(${netHsl.h} ${netHsl.s}% ${netHsl.l}% / 0.15)`);
+        root.style.setProperty('--chart-neutral', `hsl(${spotHsl.h} ${spotHsl.s}% ${spotHsl.l}%)`);
+        root.style.setProperty('--chart-neutral-soft', `hsl(${spotHsl.h} ${spotHsl.s}% ${spotHsl.l}% / 0.15)`);
+
+        // Save to localStorage
+        localStorage.setItem('gex-theme', JSON.stringify({ bg, card, text, muted, positive, negative, aggregate, net, spot }));
+    }
+
+    function resetTheme() {
+        document.getElementById('bgColor').value = DEFAULT_THEME.bg;
+        document.getElementById('cardColor').value = DEFAULT_THEME.card;
+        document.getElementById('textColor').value = DEFAULT_THEME.text;
+        document.getElementById('mutedColor').value = DEFAULT_THEME.muted;
+        document.getElementById('positiveColor').value = DEFAULT_THEME.positive;
+        document.getElementById('negativeColor').value = DEFAULT_THEME.negative;
+        document.getElementById('aggregateColor').value = DEFAULT_THEME.aggregate;
+        document.getElementById('netColor').value = DEFAULT_THEME.net;
+        document.getElementById('spotColor').value = DEFAULT_THEME.spot;
+        updateTheme();
+        localStorage.removeItem('gex-theme');
+    }
+
+    function loadTheme() {
+        const saved = localStorage.getItem('gex-theme');
+        if (saved) {
+            try {
+                const theme = JSON.parse(saved);
+                document.getElementById('bgColor').value = theme.bg;
+                document.getElementById('cardColor').value = theme.card;
+                document.getElementById('textColor').value = theme.text;
+                document.getElementById('mutedColor').value = theme.muted;
+                document.getElementById('positiveColor').value = theme.positive;
+                document.getElementById('negativeColor').value = theme.negative;
+                document.getElementById('aggregateColor').value = theme.aggregate;
+                document.getElementById('netColor').value = theme.net;
+                document.getElementById('spotColor').value = theme.spot;
+                updateTheme();
+            } catch (e) { /* ignore */ }
         }
     }
 
-    // ===== ASSET CLASS SWITCH =====
+    function updateChartHeight() {
+        const val = document.getElementById('chartHeight')?.value || 680;
+        document.getElementById('chartHeightVal').textContent = val + 'px';
+        const container = document.getElementById('chartContainer');
+        if (container) container.style.height = val + 'px';
+        localStorage.setItem('gex-chart-height', val);
+    }
+
+    function loadChartHeight() {
+        const saved = localStorage.getItem('gex-chart-height');
+        if (saved) {
+            document.getElementById('chartHeight').value = Math.max(saved, 900);
+            updateChartHeight();
+        }
+    }
+
+    function updateSmoothing() {
+        const val = document.getElementById('lineSmoothing')?.value || 7;
+        document.getElementById('lineSmoothingVal').textContent = val;
+        localStorage.setItem('gex-smoothing', val);
+        if (window.chart && window.chart.render && currentData && currentSpot) {
+            window.chart.render(currentData, currentSpot, activeSeries);
+        }
+    }
+
+    function loadSmoothing() {
+        const saved = localStorage.getItem('gex-smoothing');
+        if (saved) {
+            document.getElementById('lineSmoothing').value = saved;
+            updateSmoothing();
+        }
+    }
+
     function switchAssetClass(cls) {
         currentAssetClass = cls;
-
-        // Update tabs
         document.querySelectorAll('.asset-tab').forEach(tab => {
             tab.classList.toggle('active', tab.dataset.class === cls);
         });
-
-        // Update ticker grid
         renderTickerGrid(TICKER_PRESETS[cls] || TICKER_PRESETS.equity);
     }
 
-    // ===== TICKER GRID =====
     function renderTickerGrid(tickers) {
         const grid = document.getElementById('tickerGrid');
         if (!grid) return;
-
         const currentTicker = document.getElementById('tickerInput')?.value?.toUpperCase() || '';
-
         grid.innerHTML = tickers.map(t => `
             <div class="ticker-btn ${t === currentTicker ? 'active' : ''}" onclick="ui.selectTicker('${t}')">${t}</div>
         `).join('');
@@ -88,41 +228,30 @@ const UIManager = (function() {
     function selectTicker(ticker) {
         const input = document.getElementById('tickerInput');
         if (input) input.value = ticker;
-
-        // Update active state
         document.querySelectorAll('.ticker-btn').forEach(btn => {
             btn.classList.toggle('active', btn.textContent === ticker);
         });
-
-        // Close sidebar on mobile
         if (window.innerWidth <= 1200) {
             sidebarOpen = false;
             document.getElementById('sidebar')?.classList.remove('open');
         }
-
-        // Trigger search
-        if (window.app && window.app.searchTicker) {
-            window.app.searchTicker();
-        }
+        if (window.app && window.app.searchTicker) window.app.searchTicker();
     }
 
-    // ===== EXPirations =====
     function renderExpirations(expirations, selectedExp) {
         const list = document.getElementById('expList');
         const count = document.getElementById('expCount');
         if (!list) return;
-
         if (count) count.textContent = `${expirations.length} available`;
-
         if (expirations.length === 0) {
             list.innerHTML = '<div class="exp-placeholder">No expirations available</div>';
             return;
         }
-
         list.innerHTML = expirations.slice(0, 20).map(exp => {
             const isSelected = exp === selectedExp;
+            const expQuoted = JSON.stringify(exp);
             return `
-                <div class="exp-item ${isSelected ? 'selected' : ''}" onclick="ui.selectExp(${exp}, this)">
+                <div class="exp-item ${isSelected ? 'selected' : ''}" data-exp="${exp}" onclick="ui.selectExp(this)">
                     <span>${formatDate(exp)}</span>
                     <span class="days">${formatDaysLeft(exp)}</span>
                 </div>
@@ -130,34 +259,35 @@ const UIManager = (function() {
         }).join('');
     }
 
-    function selectExp(timestamp, el) {
-        // Remove selected from all
+    function selectExp(el) {
+        const timestamp = el.getAttribute('data-exp');
         document.querySelectorAll('.exp-item').forEach(item => item.classList.remove('selected'));
-        // Add to clicked
         el.classList.add('selected');
-
-        // Update app state
-        if (window.app && window.app.setExp) {
-            window.app.setExp(timestamp);
-        }
+        if (window.app && window.app.setExp) window.app.setExp(timestamp);
     }
 
-    // ===== KEY LEVELS =====
     function renderKeyLevels(levels) {
         const card = document.getElementById('levelsCard');
         const list = document.getElementById('levelsList');
         if (!card || !list) return;
-
         card.style.display = 'block';
 
+        const spotPrice = levels.spot_price !== undefined ? levels.spot_price : (levels.spotPrice || 0);
+        const inflection = levels.inflection;
+        const callWall = levels.call_wall !== undefined ? levels.call_wall : levels.callWall;
+        const putWall = levels.put_wall !== undefined ? levels.put_wall : levels.putWall;
+        const netGEX = levels.net_gex !== undefined ? levels.net_gex : levels.netGEX;
+        const zeroGamma = levels.zero_gamma !== undefined ? levels.zero_gamma : levels.zeroGamma;
+        const maxPain = levels.max_pain !== undefined ? levels.max_pain : levels.maxPain;
+
         const rows = [
-            { label: 'Current Price', value: formatPrice(levels.spotPrice || 0), color: 'cyan', dot: '#00e5ff' },
-            { label: 'Gamma Inflection', value: formatPrice(levels.inflection), color: 'purple', dot: '#aa00ff' },
-            { label: 'Call Wall', value: formatPrice(levels.callWall), color: 'green', dot: '#00e676' },
-            { label: 'Put Wall', value: formatPrice(levels.putWall), color: 'red', dot: '#ff1744' },
-            { label: 'Net GEX', value: formatNumber(levels.netGEX), color: 'yellow', dot: '#ffea00' },
-            { label: 'Zero Gamma', value: formatPrice(levels.zeroGamma), color: 'cyan', dot: '#00e5ff' },
-            { label: 'Max Pain', value: formatPrice(levels.maxPain), color: 'purple', dot: '#aa00ff' },
+            { label: 'Current Price', value: formatPrice(spotPrice), color: 'neutral', dot: 'var(--chart-neutral)' },
+            { label: 'Gamma Inflection', value: formatPrice(inflection), color: 'accent', dot: 'var(--chart-accent)' },
+            { label: 'Call Wall', value: formatPrice(callWall), color: 'positive', dot: 'var(--chart-positive)' },
+            { label: 'Put Wall', value: formatPrice(putWall), color: 'negative', dot: 'var(--chart-negative)' },
+            { label: 'Net GEX', value: formatNumber(netGEX), color: 'warn', dot: 'var(--chart-warn)' },
+            { label: 'Zero Gamma', value: formatPrice(zeroGamma), color: 'neutral', dot: 'var(--chart-neutral)' },
+            { label: 'Max Pain', value: formatPrice(maxPain), color: 'accent', dot: 'var(--chart-accent)' },
         ];
 
         list.innerHTML = rows.map(row => `
@@ -171,7 +301,6 @@ const UIManager = (function() {
         `).join('');
     }
 
-    // ===== PRICE BAR =====
     function renderPriceBar(quote, levels) {
         const bar = document.getElementById('priceBar');
         if (!bar) return;
@@ -186,46 +315,53 @@ const UIManager = (function() {
         const callWallEl = document.getElementById('statCallWall');
         const putWallEl = document.getElementById('statPutWall');
 
+        const change = quote.change !== undefined ? quote.change : 0;
+        const changePercent = quote.change_percent !== undefined ? quote.change_percent : (quote.changePercent || 0);
+        const isPositiveGamma = levels.is_positive_gamma !== undefined ? levels.is_positive_gamma : levels.isPositiveGamma;
+        const totalGEX = levels.total_gex !== undefined ? levels.total_gex : levels.totalGEX;
+        const callWall = levels.call_wall !== undefined ? levels.call_wall : levels.callWall;
+        const putWall = levels.put_wall !== undefined ? levels.put_wall : levels.putWall;
+
         if (priceEl) priceEl.textContent = formatPrice(quote.price);
         if (changeEl) {
-            changeEl.textContent = `${quote.change >= 0 ? '+' : ''}${formatPrice(quote.change)} (${formatPercent(quote.changePercent)})`;
-            changeEl.className = `price-change ${quote.change >= 0 ? 'up' : 'down'}`;
+            changeEl.textContent = `${change >= 0 ? '+' : ''}${formatPrice(change)} (${formatPercent(changePercent)})`;
+            changeEl.className = `price-change ${change >= 0 ? 'up' : 'down'}`;
         }
-
         if (zoneEl) {
-            if (levels.isPositiveGamma) {
+            if (isPositiveGamma) {
                 zoneEl.textContent = 'Positive';
-                zoneEl.style.color = '#00e676';
+                zoneEl.style.color = 'var(--chart-positive)';
                 if (zoneDescEl) zoneDescEl.textContent = 'Stabilizing / Mean-reverting';
             } else {
                 zoneEl.textContent = 'Negative';
-                zoneEl.style.color = '#ff1744';
+                zoneEl.style.color = 'var(--chart-negative)';
                 if (zoneDescEl) zoneDescEl.textContent = 'Amplifying / Trending';
             }
         }
-
-        if (totalGEXEl) totalGEXEl.textContent = formatNumber(levels.totalGEX);
-        if (totalGEXDescEl) totalGEXDescEl.textContent = levels.totalGEX > 0 ? 'Net Long Gamma' : 'Net Short Gamma';
-
-        if (callWallEl) callWallEl.textContent = formatPrice(levels.callWall);
-        if (putWallEl) putWallEl.textContent = formatPrice(levels.putWall);
+        if (totalGEXEl) totalGEXEl.textContent = formatNumber(totalGEX);
+        if (totalGEXDescEl) totalGEXDescEl.textContent = totalGEX > 0 ? 'Net Long Gamma' : 'Net Short Gamma';
+        if (callWallEl) callWallEl.textContent = formatPrice(callWall);
+        if (putWallEl) putWallEl.textContent = formatPrice(putWall);
     }
 
-    // ===== REGIME BADGE =====
     function updateRegimeBadge(isPositive) {
         const pill = document.getElementById('regimePill');
         const text = document.getElementById('regimeText');
         if (!pill || !text) return;
-
         pill.className = `status-pill ${isPositive ? 'positive' : 'negative'}`;
         text.textContent = isPositive ? 'Positive Gamma' : 'Negative Gamma';
     }
 
-    // ===== GREEKS PANEL =====
     function renderGreeksPanel(levels, summary) {
         const panel = document.getElementById('greeksPanel');
         if (!panel) return;
         panel.style.display = 'grid';
+
+        const maxPain = levels.max_pain !== undefined ? levels.max_pain : levels.maxPain;
+        const netDEX = levels.net_dex !== undefined ? levels.net_dex : levels.netDEX;
+        const totalVanna = levels.total_vanna !== undefined ? levels.total_vanna : levels.totalVanna;
+        const totalCharm = levels.total_charm !== undefined ? levels.total_charm : levels.totalCharm;
+        const ivSkew = levels.iv_skew !== undefined ? levels.iv_skew : levels.ivSkew;
 
         const maxPainEl = document.getElementById('greekMaxPain');
         const pcrEl = document.getElementById('greekPCR');
@@ -236,30 +372,25 @@ const UIManager = (function() {
         const ivSkewEl = document.getElementById('greekIVSkew');
         const ivSkewDescEl = document.getElementById('greekIVSkewDesc');
 
-        if (maxPainEl) maxPainEl.textContent = formatPrice(levels.maxPain);
-
+        if (maxPainEl) maxPainEl.textContent = formatPrice(maxPain);
         if (pcrEl && summary) {
-            const pcr = summary.totalPutOI / (summary.totalCallOI || 1);
+            const pcr = summary.put_call_ratio !== undefined ? summary.put_call_ratio :
+                       (summary.total_put_oi || summary.totalPutOI || 1) / (summary.total_call_oi || summary.totalCallOI || 1);
             pcrEl.textContent = pcr.toFixed(2);
-            if (pcrDescEl) {
-                pcrDescEl.textContent = pcr > 1.2 ? 'Bearish skew' : pcr < 0.8 ? 'Bullish skew' : 'Neutral';
-            }
+            if (pcrDescEl) pcrDescEl.textContent = pcr > 1.2 ? 'Bearish skew' : pcr < 0.8 ? 'Bullish skew' : 'Neutral';
         }
-
-        if (netDeltaEl) netDeltaEl.textContent = formatNumber(levels.netDEX);
-        if (netVannaEl) netVannaEl.textContent = formatNumber(levels.totalVanna);
-        if (netCharmEl) netCharmEl.textContent = formatNumber(levels.totalCharm);
-
+        if (netDeltaEl) netDeltaEl.textContent = formatNumber(netDEX);
+        if (netVannaEl) netVannaEl.textContent = formatNumber(totalVanna);
+        if (netCharmEl) netCharmEl.textContent = formatNumber(totalCharm);
         if (ivSkewEl) {
-            ivSkewEl.textContent = (levels.ivSkew || 0).toFixed(2) + '%';
+            ivSkewEl.textContent = (ivSkew || 0).toFixed(2) + '%';
             if (ivSkewDescEl) {
-                const skew = levels.ivSkew || 0;
+                const skew = ivSkew || 0;
                 ivSkewDescEl.textContent = skew > 2 ? 'Fear premium (puts expensive)' : skew < -1 ? 'Call skew (bullish)' : 'Normal skew';
             }
         }
     }
 
-    // ===== REGIME ANALYSIS =====
     function renderRegimeAnalysis(levels, quote) {
         const card = document.getElementById('analysisCard');
         const content = document.getElementById('analysisContent');
@@ -268,33 +399,36 @@ const UIManager = (function() {
 
         const spot = quote.price;
         const inflection = levels.inflection;
+        const callWall = levels.call_wall !== undefined ? levels.call_wall : levels.callWall;
+        const putWall = levels.put_wall !== undefined ? levels.put_wall : levels.putWall;
+        const netDEX = levels.net_dex !== undefined ? levels.net_dex : levels.netDEX;
+        const totalVanna = levels.total_vanna !== undefined ? levels.total_vanna : levels.totalVanna;
+        const totalCharm = levels.total_charm !== undefined ? levels.total_charm : levels.totalCharm;
+        const isPositiveGamma = levels.is_positive_gamma !== undefined ? levels.is_positive_gamma : levels.isPositiveGamma;
+
         const distToInflection = spot - inflection;
-        const distToCall = levels.callWall - spot;
-        const distToPut = spot - levels.putWall;
+        const distToCall = callWall - spot;
+        const distToPut = spot - putWall;
 
         let html = '';
-
-        if (levels.isPositiveGamma) {
-            html += `<p><span class="highlight-green">Positive Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>above</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
-            html += `<p>Market makers are <strong>net long gamma</strong> and will <span class="highlight-green">sell into rallies, buy into dips</span> — this is a <strong>stabilizing, mean-reverting</strong> regime.</p>`;
-            html += `<p>The Call Wall at <span class="highlight-green">$${formatPrice(levels.callWall)}</span> (${distToCall > 0 ? '+' : ''}${formatPrice(distToCall)} away) acts as resistance where selling pressure may intensify.</p>`;
-            html += `<p>The Put Wall at <span class="highlight-red">$${formatPrice(levels.putWall)}</span> (${distToPut > 0 ? '+' : ''}${formatPrice(distToPut)} below) acts as support where buying interest may emerge.</p>`;
-            html += `<p><strong>Net DEX:</strong> ${formatNumber(levels.netDEX)} — ${levels.netDEX > 0 ? 'net long delta (bullish bias)' : 'net short delta (bearish bias)'}</p>`;
+        if (isPositiveGamma) {
+            html += `<p><span class="highlight-positive">Positive Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>above</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
+            html += `<p>Market makers are <strong>net long gamma</strong> and will <span class="highlight-positive">sell into rallies, buy into dips</span> — this is a <strong>stabilizing, mean-reverting</strong> regime.</p>`;
+            html += `<p>The Call Wall at <span class="highlight-positive">$${formatPrice(callWall)}</span> (${distToCall > 0 ? '+' : ''}${formatPrice(distToCall)} away) acts as resistance where selling pressure may intensify.</p>`;
+            html += `<p>The Put Wall at <span class="highlight-negative">$${formatPrice(putWall)}</span> (${distToPut > 0 ? '+' : ''}${formatPrice(distToPut)} below) acts as support where buying interest may emerge.</p>`;
+            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} — ${netDEX > 0 ? 'net long delta (bullish bias)' : 'net short delta (bearish bias)'}</p>`;
         } else {
-            html += `<p><span class="highlight-red">Negative Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>below</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
-            html += `<p>Market makers are <strong>net short gamma</strong> and will <span class="highlight-red">buy into rallies, sell into dips</span> — this is an <strong>amplifying, trending/volatile</strong> regime.</p>`;
-            html += `<p>The inflection at <span class="highlight-yellow">$${formatPrice(inflection)}</span> (${distToInflection > 0 ? '+' : ''}${formatPrice(distToInflection)} above) is the key level to reclaim for stabilization.</p>`;
-            html += `<p>Below the Put Wall at <span class="highlight-red">$${formatPrice(levels.putWall)}</span>, downside moves may accelerate as dealers are forced to sell into weakness.</p>`;
-            html += `<p><strong>Net DEX:</strong> ${formatNumber(levels.netDEX)} — ${levels.netDEX > 0 ? 'net long delta (bullish bias despite negative gamma)' : 'net short delta (bearish bias amplified)'}</p>`;
+            html += `<p><span class="highlight-negative">Negative Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>below</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
+            html += `<p>Market makers are <strong>net short gamma</strong> and will <span class="highlight-negative">buy into rallies, sell into dips</span> — this is an <strong>amplifying, trending/volatile</strong> regime.</p>`;
+            html += `<p>The inflection at <span class="highlight-warn">$${formatPrice(inflection)}</span> (${distToInflection > 0 ? '+' : ''}${formatPrice(distToInflection)} above) is the key level to reclaim for stabilization.</p>`;
+            html += `<p>Below the Put Wall at <span class="highlight-negative">$${formatPrice(putWall)}</span>, downside moves may accelerate as dealers are forced to sell into weakness.</p>`;
+            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} — ${netDEX > 0 ? 'net long delta (bullish bias despite negative gamma)' : 'net short delta (bearish bias amplified)'}</p>`;
         }
-
-        html += `<p style="margin-top:12px;"><strong>Vanna:</strong> ${formatNumber(levels.totalVanna)} — ${Math.abs(levels.totalVanna) > 1000000 ? 'High vol sensitivity. IV moves will shift delta significantly.' : 'Moderate vol sensitivity.'}</p>`;
-        html += `<p><strong>Charm:</strong> ${formatNumber(levels.totalCharm)} — ${Math.abs(levels.totalCharm) > 500000 ? 'Significant time decay. Delta hedges will shift rapidly into expiry.' : 'Normal time decay profile.'}</p>`;
-
+        html += `<p style="margin-top:12px;"><strong>Vanna:</strong> ${formatNumber(totalVanna)} — ${Math.abs(totalVanna) > 1000000 ? 'High vol sensitivity. IV moves will shift delta significantly.' : 'Moderate vol sensitivity.'}</p>`;
+        html += `<p><strong>Charm:</strong> ${formatNumber(totalCharm)} — ${Math.abs(totalCharm) > 500000 ? 'Significant time decay. Delta hedges will shift rapidly into expiry.' : 'Normal time decay profile.'}</p>`;
         content.innerHTML = html;
     }
 
-    // ===== LOADING =====
     function showLoading() {
         const overlay = document.getElementById('loadingOverlay');
         if (overlay) overlay.classList.add('active');
@@ -305,7 +439,6 @@ const UIManager = (function() {
         if (overlay) overlay.classList.remove('active');
     }
 
-    // ===== CHART TITLE =====
     function updateChartTitle(ticker, expDate) {
         const tickerEl = document.getElementById('chartTicker');
         const expEl = document.getElementById('chartExp');
@@ -313,40 +446,50 @@ const UIManager = (function() {
         if (expEl) expEl.textContent = expDate ? `(${formatDate(expDate)})` : '';
     }
 
-    // ===== LAST UPDATE =====
     function updateLastUpdate() {
         const el = document.getElementById('lastUpdate');
         if (el) el.textContent = new Date().toLocaleTimeString();
     }
 
-    // ===== GENERATE BUTTON =====
     function setGenerateEnabled(enabled) {
         const btn = document.getElementById('generateBtn');
         if (btn) btn.disabled = !enabled;
     }
 
-    // ===== ERROR DISPLAY =====
     function showError(message, retryCallback) {
         const expList = document.getElementById('expList');
         if (!expList) return;
 
+        const isNoOptions = message.includes('No options') || message.includes('No options expirations') || message.includes('does not have options');
+        const ticker = document.getElementById('tickerInput')?.value?.toUpperCase() || '';
+        const unsupported = ['ES=', 'NQ=', 'YM=', 'RTY=', 'GC=', 'SI=', 'CL=', 'NG=', 'ZB=', 'ZN=', 'ZW=', 'ZC=', 'ZS=', 'KC=', 'CT=', 'CC=', 'SB=', 'HG=', 'PA=', 'PL=', 'BTC-', 'ETH-', 'SOL-', 'XRP-', 'ADA-', 'DOGE-', 'EURUSD=', 'GBPUSD=', 'USDJPY=', 'AUDUSD='];
+        const isUnsupported = unsupported.some(p => ticker.startsWith(p));
+
+        let extraMsg = '';
+        if (isNoOptions && isUnsupported) {
+            extraMsg = '<div style="margin-top:8px;font-size:11px;opacity:0.7;">This ticker type does not have options data on Yahoo Finance. Try SPY, QQQ, TSLA, NVDA, AAPL, or other individual stocks/ETFs.</div>';
+        } else if (isNoOptions) {
+            extraMsg = '<div style="margin-top:8px;font-size:11px;opacity:0.7;">This ticker may not have options, or Yahoo Finance may be temporarily unavailable. Try SPY or QQQ to verify the connection.</div>';
+        }
+
         expList.innerHTML = `
             <div class="error-msg">
-                <span>⚠️</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
                 <div style="flex:1">
-                    <div style="font-weight:700;">Error</div>
-                    <div style="margin-top:4px;font-size:12px;">${message}</div>
+                    <div style="font-weight:600;">Error</div>
+                    <div style="margin-top:4px;font-size:12px;opacity:0.8;">${message}</div>
+                    ${extraMsg}
                 </div>
                 ${retryCallback ? '<button onclick="' + retryCallback + '()">Retry</button>' : ''}
             </div>
         `;
     }
 
-    // ===== INIT =====
     function init() {
         renderTickerGrid(TICKER_PRESETS.equity);
-
-        // Mobile sidebar close on outside click
+        loadTheme();
+        loadChartHeight();
+        loadSmoothing();
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
             const toggle = document.getElementById('mobileNavToggle');
@@ -355,48 +498,23 @@ const UIManager = (function() {
                 sidebar.classList.remove('open');
             }
         });
-
-        // Enter key on search
         const input = document.getElementById('tickerInput');
         if (input) {
             input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    if (window.app && window.app.searchTicker) {
-                        window.app.searchTicker();
-                    }
-                }
+                if (e.key === 'Enter' && window.app && window.app.searchTicker) window.app.searchTicker();
             });
         }
     }
 
-    // ===== PUBLIC API =====
     return {
-        init,
-        toggleSidebar,
-        switchAssetClass,
-        selectTicker,
-        renderTickerGrid,
-        renderExpirations,
-        selectExp,
-        renderKeyLevels,
-        renderPriceBar,
-        updateRegimeBadge,
-        renderGreeksPanel,
-        renderRegimeAnalysis,
-        showLoading,
-        hideLoading,
-        updateChartTitle,
-        updateLastUpdate,
-        setGenerateEnabled,
-        showError,
-        formatDate,
-        formatDaysLeft,
-        formatPrice,
-        formatNumber,
-        formatPercent,
+        init, toggleSidebar, toggleSettings, switchAssetClass, selectTicker, renderTickerGrid,
+        renderExpirations, selectExp, renderKeyLevels, renderPriceBar,
+        updateRegimeBadge, renderGreeksPanel, renderRegimeAnalysis,
+        showLoading, hideLoading, updateChartTitle, updateLastUpdate,
+        setGenerateEnabled, showError, updateTheme, resetTheme, updateChartHeight, updateSmoothing,
+        formatDate, formatDaysLeft, formatPrice, formatNumber, formatPercent,
         TICKER_PRESETS
     };
 })();
 
-// Expose to window for HTML onclick handlers
 window.ui = UIManager;

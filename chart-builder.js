@@ -1,5 +1,6 @@
 /* ===== CHART BUILDER =====
- * Configures and renders Chart.js charts for GEX, DEX, Vanna, Charm, OI, IV Skew
+ * Horizontal GEX chart — single axis, hardcoded colors
+ * Restored from working version + annotation v3 syntax fixes
  */
 
 const ChartBuilder = (function() {
@@ -7,557 +8,349 @@ const ChartBuilder = (function() {
 
     let chartInstance = null;
     let currentData = null;
-    let activeSeries = ['gex', 'dex'];
+    let currentLevels = null;
+    let currentSpot = 0;
+    let activeSeries = 'gex';
 
-    // ===== COLOR PALETTE =====
+    let showAggregate = true;
+    let showNet = true;
+    let showSplit = false;
+    let showCallWall = true;
+    let showPutWall = true;
+    let showInflection = true;
+    let showZeroGamma = false;
+    let showSpot = true;
+
     const COLORS = {
-        callGEX: 'rgba(0, 230, 118, 0.65)',
-        callGEXBorder: 'rgba(0, 230, 118, 0.9)',
-        putGEX: 'rgba(255, 23, 68, 0.65)',
-        putGEXBorder: 'rgba(255, 23, 68, 0.9)',
-        aggregateGEX: 'rgba(170, 0, 255, 0.9)',
-        aggregateGEXFill: 'rgba(170, 0, 255, 0.08)',
-        netGEX: 'rgba(255, 234, 0, 0.95)',
-        netGEXFill: 'rgba(255, 234, 0, 0.05)',
-        dex: 'rgba(41, 121, 255, 0.9)',
-        dexFill: 'rgba(41, 121, 255, 0.08)',
-        vanna: 'rgba(255, 145, 0, 0.9)',
-        vannaFill: 'rgba(255, 145, 0, 0.08)',
-        charm: 'rgba(0, 229, 255, 0.9)',
-        charmFill: 'rgba(0, 229, 255, 0.08)',
-        oi: 'rgba(160, 160, 176, 0.7)',
-        iv: 'rgba(255, 105, 180, 0.9)',
-        grid: 'rgba(255, 255, 255, 0.04)',
-        text: '#555560',
-        textLight: '#777788'
+        call: 'hsla(142, 71%, 45%, 0.65)',
+        callBorder: 'hsla(142, 71%, 45%, 0.90)',
+        put: 'hsla(0, 72%, 51%, 0.65)',
+        putBorder: 'hsla(0, 72%, 51%, 0.90)',
+        aggregate: 'hsla(262, 83%, 58%, 0.95)',
+        aggregateFill: 'hsla(262, 83%, 58%, 0.08)',
+        net: 'hsla(38, 92%, 50%, 0.95)',
+        netFill: 'hsla(38, 92%, 50%, 0.06)',
+        dex: 'hsla(217, 91%, 60%, 0.95)',
+        dexFill: 'hsla(217, 91%, 60%, 0.08)',
+        vanna: 'hsla(25, 95%, 53%, 0.95)',
+        vannaFill: 'hsla(25, 95%, 53%, 0.08)',
+        charm: 'hsla(199, 89%, 48%, 0.95)',
+        charmFill: 'hsla(199, 89%, 48%, 0.08)',
+        oi: 'hsla(0, 0%, 60%, 0.80)',
+        iv: 'hsla(330, 81%, 60%, 0.95)',
+        grid: 'hsla(0, 0%, 100%, 0.06)',
+        text: 'hsla(0, 0%, 55%, 1)',
+        callWall: 'hsla(142, 71%, 45%, 0.80)',
+        putWall: 'hsla(0, 72%, 51%, 0.80)',
+        inflection: 'hsla(262, 83%, 58%, 0.80)',
+        zeroGamma: 'hsla(262, 83%, 58%, 0.80)',
+        spot: 'hsla(217, 91%, 60%, 0.80)'
     };
 
-    // ===== LEGEND CONFIG =====
-    const LEGENDS = {
-        gex: [
-            { color: 'rgba(170, 0, 255, 0.7)', label: 'Aggregate GEX' },
-            { color: 'rgba(255, 23, 68, 0.7)', label: 'Put GEX' },
-            { color: 'rgba(0, 230, 118, 0.7)', label: 'Call GEX' },
-            { color: 'rgba(255, 234, 0, 0.9)', label: 'Net GEX (Cumulative)' }
-        ],
-        dex: [
-            { color: 'rgba(41, 121, 255, 0.9)', label: 'Net DEX (Cumulative)' },
-            { color: 'rgba(0, 230, 118, 0.6)', label: 'Call DEX' },
-            { color: 'rgba(255, 23, 68, 0.6)', label: 'Put DEX' }
-        ],
-        vanna: [
-            { color: 'rgba(255, 145, 0, 0.9)', label: 'Net Vanna' },
-            { color: 'rgba(0, 230, 118, 0.6)', label: 'Call Vanna' },
-            { color: 'rgba(255, 23, 68, 0.6)', label: 'Put Vanna' }
-        ],
-        charm: [
-            { color: 'rgba(0, 229, 255, 0.9)', label: 'Net Charm' },
-            { color: 'rgba(0, 230, 118, 0.6)', label: 'Call Charm' },
-            { color: 'rgba(255, 23, 68, 0.6)', label: 'Put Charm' }
-        ],
-        oi: [
-            { color: 'rgba(0, 230, 118, 0.6)', label: 'Call OI' },
-            { color: 'rgba(255, 23, 68, 0.6)', label: 'Put OI' },
-            { color: 'rgba(160, 160, 176, 0.7)', label: 'Total OI' }
-        ],
-        iv: [
-            { color: 'rgba(255, 105, 180, 0.9)', label: 'Call IV' },
-            { color: 'rgba(0, 229, 255, 0.9)', label: 'Put IV' },
-            { color: 'rgba(255, 234, 0, 0.9)', label: 'IV Skew (Put - Call)' }
-        ]
-    };
-
-    // ===== TOOLTIP FORMATTER =====
-    function formatTooltipValue(val) {
-        const abs = Math.abs(val);
-        if (abs >= 1000000000) return (val / 1000000000).toFixed(2) + 'B';
-        if (abs >= 1000000) return (val / 1000000).toFixed(2) + 'M';
-        if (abs >= 1000) return (val / 1000).toFixed(1) + 'K';
-        return val.toFixed(0);
+    function fmt(v) {
+        const a = Math.abs(v);
+        if (a >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+        if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+        if (a >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+        return v.toFixed(0);
     }
 
-    // ===== BUILD DATASETS =====
+    function get(d, camel, snake) {
+        return d[camel] !== undefined ? d[camel] : (d[snake] !== undefined ? d[snake] : 0);
+    }
+
+    function smooth(data, ws) {
+        if (!ws || ws < 2) return data;
+        const res = [];
+        for (let i = 0; i < data.length; i++) {
+            let sum = 0, cnt = 0;
+            const h = Math.floor(ws / 2);
+            for (let j = Math.max(0, i - h); j <= Math.min(data.length - 1, i + h); j++) {
+                sum += data[j]; cnt++;
+            }
+            res.push(sum / cnt);
+        }
+        return res;
+    }
+
     function buildDatasets(data, spotPrice, series) {
         const datasets = [];
-        const labels = data.map(d => d.strike.toFixed(1));
-
-        // Filter to strikes near spot (within 12% for cleaner chart)
         const range = 0.12;
-        const minStrike = spotPrice * (1 - range);
-        const maxStrike = spotPrice * (1 + range);
-        const filtered = data.filter(d => d.strike >= minStrike && d.strike <= maxStrike);
-        const filteredLabels = filtered.map(d => d.strike.toFixed(1));
+        const minS = spotPrice * (1 - range);
+        const maxS = spotPrice * (1 + range);
+        const filtered = data.filter(d => d.strike >= minS && d.strike <= maxS);
+        const labels = filtered.map(d => d.strike.toFixed(1));
+        const sw = parseInt(localStorage.getItem('gex-smoothing') || '7');
 
-        // Find spot index for annotation
-        const spotIndex = filtered.findIndex(d => d.strike >= spotPrice);
-
-        if (series.includes('gex')) {
-            // Aggregate GEX line
+        const addBar = (label, arr, bg, border) => {
             datasets.push({
-                label: 'Aggregate GEX',
-                data: filtered.map(d => d.aggregateGEX),
-                borderColor: COLORS.aggregateGEX,
-                backgroundColor: COLORS.aggregateGEXFill,
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 1
+                label, data: arr,
+                backgroundColor: bg, borderColor: border, borderWidth: 1,
+                type: 'bar', xAxisID: 'x',
+                barPercentage: 0.85, categoryPercentage: 0.95,
+                indexAxis: 'y', order: 2
             });
+        };
 
-            // Put GEX bars
+        const addLine = (label, arr, color, thick) => {
             datasets.push({
-                label: 'Put GEX',
-                data: filtered.map(d => d.putGEX),
-                backgroundColor: COLORS.putGEX,
-                borderColor: COLORS.putGEXBorder,
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.65,
-                categoryPercentage: 0.8,
-                order: 3
+                label, data: arr,
+                borderColor: color, backgroundColor: 'transparent',
+                borderWidth: thick ? 2.5 : 2,
+                type: 'line', xAxisID: 'x',
+                tension: 0.4, pointRadius: 0, pointHoverRadius: 4,
+                fill: false, indexAxis: 'y', order: 0
             });
+        };
 
-            // Call GEX bars
-            datasets.push({
-                label: 'Call GEX',
-                data: filtered.map(d => d.callGEX),
-                backgroundColor: COLORS.callGEX,
-                borderColor: COLORS.callGEXBorder,
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.65,
-                categoryPercentage: 0.8,
-                order: 2
-            });
-
-            // Net GEX cumulative line
-            datasets.push({
-                label: 'Net GEX (Cumulative)',
-                data: filtered.map(d => d.cumulativeGEX),
-                borderColor: COLORS.netGEX,
-                backgroundColor: COLORS.netGEXFill,
-                borderWidth: 2.5,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
-            });
+        if (series === 'gex') {
+            if (showSplit) {
+                addBar('Put GEX', filtered.map(d => get(d, 'putGEX', 'put_gex')), COLORS.put, COLORS.putBorder);
+                addBar('Call GEX', filtered.map(d => get(d, 'callGEX', 'call_gex')), COLORS.call, COLORS.callBorder);
+            } else {
+                addBar('Net GEX', filtered.map(d => get(d, 'totalGEX', 'total_gex')),
+                    (ctx) => { const v = ctx.raw; return v >= 0 ? COLORS.call : COLORS.put; },
+                    (ctx) => { const v = ctx.raw; return v >= 0 ? COLORS.callBorder : COLORS.putBorder; });
+            }
+            if (showAggregate) addLine('Aggregate GEX', smooth(filtered.map(d => get(d, 'aggregateGEX', 'aggregate_gex')), sw), COLORS.aggregate);
+            if (showNet) addLine('Cumulative GEX', smooth(filtered.map(d => get(d, 'cumulativeGEX', 'cumulative_gex')), sw), COLORS.net, true);
         }
 
-        if (series.includes('dex')) {
-            datasets.push({
-                label: 'Net DEX (Cumulative)',
-                data: filtered.map(d => d.cumulativeDEX),
-                borderColor: COLORS.dex,
-                backgroundColor: COLORS.dexFill,
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
-            });
-
-            datasets.push({
-                label: 'Call DEX',
-                data: filtered.map(d => d.callDEX),
-                backgroundColor: 'rgba(0, 230, 118, 0.4)',
-                borderColor: 'rgba(0, 230, 118, 0.6)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 2
-            });
-
-            datasets.push({
-                label: 'Put DEX',
-                data: filtered.map(d => d.putDEX),
-                backgroundColor: 'rgba(255, 23, 68, 0.4)',
-                borderColor: 'rgba(255, 23, 68, 0.6)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 3
-            });
+        if (series === 'dex') {
+            if (showSplit) {
+                addBar('Put DEX', filtered.map(d => get(d, 'putDEX', 'put_dex')), 'hsla(0, 72%, 51%, 0.40)', 'hsla(0, 72%, 51%, 0.60)');
+                addBar('Call DEX', filtered.map(d => get(d, 'callDEX', 'call_dex')), 'hsla(142, 71%, 45%, 0.40)', 'hsla(142, 71%, 45%, 0.60)');
+            } else {
+                addBar('Net DEX', filtered.map(d => get(d, 'totalDEX', 'total_dex')),
+                    (ctx) => { const v = ctx.raw; return v >= 0 ? 'hsla(142, 71%, 45%, 0.45)' : 'hsla(0, 72%, 51%, 0.45)'; },
+                    (ctx) => { const v = ctx.raw; return v >= 0 ? 'hsla(142, 71%, 45%, 0.65)' : 'hsla(0, 72%, 51%, 0.65)'; });
+            }
+            if (showNet) addLine('Cumulative DEX', smooth(filtered.map(d => get(d, 'cumulativeDEX', 'cumulative_dex')), sw), COLORS.dex, true);
         }
 
-        if (series.includes('vanna')) {
-            datasets.push({
-                label: 'Net Vanna',
-                data: filtered.map(d => d.totalVanna),
-                borderColor: COLORS.vanna,
-                backgroundColor: COLORS.vannaFill,
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
-            });
-
-            datasets.push({
-                label: 'Call Vanna',
-                data: filtered.map(d => d.callVanna),
-                backgroundColor: 'rgba(0, 230, 118, 0.35)',
-                borderColor: 'rgba(0, 230, 118, 0.5)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 2
-            });
-
-            datasets.push({
-                label: 'Put Vanna',
-                data: filtered.map(d => d.putVanna),
-                backgroundColor: 'rgba(255, 23, 68, 0.35)',
-                borderColor: 'rgba(255, 23, 68, 0.5)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 3
-            });
+        if (series === 'vanna') {
+            if (showSplit) {
+                addBar('Put Vanna', filtered.map(d => get(d, 'putVanna', 'put_vanna')), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
+                addBar('Call Vanna', filtered.map(d => get(d, 'callVanna', 'call_vanna')), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
+            } else {
+                addBar('Net Vanna', filtered.map(d => get(d, 'totalVanna', 'total_vanna')), 'hsla(25, 95%, 53%, 0.30)', 'hsla(25, 95%, 53%, 0.90)');
+            }
+            if (showNet) addLine('Cumulative Vanna', smooth(filtered.map(d => get(d, 'totalVanna', 'total_vanna')), sw), COLORS.vanna, true);
         }
 
-        if (series.includes('charm')) {
-            datasets.push({
-                label: 'Net Charm',
-                data: filtered.map(d => d.totalCharm),
-                borderColor: COLORS.charm,
-                backgroundColor: COLORS.charmFill,
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
-            });
-
-            datasets.push({
-                label: 'Call Charm',
-                data: filtered.map(d => d.callCharm),
-                backgroundColor: 'rgba(0, 230, 118, 0.35)',
-                borderColor: 'rgba(0, 230, 118, 0.5)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 2
-            });
-
-            datasets.push({
-                label: 'Put Charm',
-                data: filtered.map(d => d.putCharm),
-                backgroundColor: 'rgba(255, 23, 68, 0.35)',
-                borderColor: 'rgba(255, 23, 68, 0.5)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.5,
-                order: 3
-            });
+        if (series === 'charm') {
+            if (showSplit) {
+                addBar('Put Charm', filtered.map(d => get(d, 'putCharm', 'put_charm')), 'hsla(0, 72%, 51%, 0.35)', 'hsla(0, 72%, 51%, 0.50)');
+                addBar('Call Charm', filtered.map(d => get(d, 'callCharm', 'call_charm')), 'hsla(142, 71%, 45%, 0.35)', 'hsla(142, 71%, 45%, 0.50)');
+            } else {
+                addBar('Net Charm', filtered.map(d => get(d, 'totalCharm', 'total_charm')), 'hsla(199, 89%, 48%, 0.30)', 'hsla(199, 89%, 48%, 0.90)');
+            }
+            if (showNet) addLine('Cumulative Charm', smooth(filtered.map(d => get(d, 'totalCharm', 'total_charm')), sw), COLORS.charm, true);
         }
 
-        if (series.includes('oi')) {
-            datasets.push({
-                label: 'Call OI',
-                data: filtered.map(d => d.callOI),
-                backgroundColor: 'rgba(0, 230, 118, 0.5)',
-                borderColor: 'rgba(0, 230, 118, 0.7)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.6,
-                order: 1
-            });
-
-            datasets.push({
-                label: 'Put OI',
-                data: filtered.map(d => d.putOI),
-                backgroundColor: 'rgba(255, 23, 68, 0.5)',
-                borderColor: 'rgba(255, 23, 68, 0.7)',
-                borderWidth: 1,
-                type: 'bar',
-                yAxisID: 'y',
-                barPercentage: 0.6,
-                order: 2
-            });
-
-            datasets.push({
-                label: 'Total OI',
-                data: filtered.map(d => d.totalOI),
-                borderColor: COLORS.oi,
-                backgroundColor: 'rgba(160, 160, 176, 0.1)',
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
-            });
+        if (series === 'oi') {
+            addBar('Call OI', filtered.map(d => get(d, 'callOI', 'call_oi')), 'hsla(142, 71%, 45%, 0.45)', 'hsla(142, 71%, 45%, 0.65)');
+            addBar('Put OI', filtered.map(d => get(d, 'putOI', 'put_oi')), 'hsla(0, 72%, 51%, 0.45)', 'hsla(0, 72%, 51%, 0.65)');
+            if (showNet) addLine('Total OI', smooth(filtered.map(d => get(d, 'totalOI', 'total_oi')), sw), COLORS.oi);
         }
 
-        if (series.includes('iv')) {
+        if (series === 'iv') {
             datasets.push({
-                label: 'Call IV',
-                data: filtered.map(d => d.callIV * 100),
-                borderColor: 'rgba(255, 105, 180, 0.9)',
-                backgroundColor: 'rgba(255, 105, 180, 0.1)',
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 0
+                label: 'Call IV', data: filtered.map(d => get(d, 'callIV', 'call_iv') * 100),
+                borderColor: 'hsla(330, 81%, 60%, 0.95)', backgroundColor: 'transparent',
+                borderWidth: 1.5, type: 'line', xAxisID: 'x',
+                tension: 0.4, pointRadius: 0, pointHoverRadius: 4,
+                fill: false, indexAxis: 'y', order: 0
             });
-
             datasets.push({
-                label: 'Put IV',
-                data: filtered.map(d => d.putIV * 100),
-                borderColor: 'rgba(0, 229, 255, 0.9)',
-                backgroundColor: 'rgba(0, 229, 255, 0.1)',
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: false,
-                order: 1
+                label: 'Put IV', data: filtered.map(d => get(d, 'putIV', 'put_iv') * 100),
+                borderColor: 'hsla(199, 89%, 48%, 0.95)', backgroundColor: 'transparent',
+                borderWidth: 1.5, type: 'line', xAxisID: 'x',
+                tension: 0.4, pointRadius: 0, pointHoverRadius: 4,
+                fill: false, indexAxis: 'y', order: 1
             });
-
-            datasets.push({
-                label: 'IV Skew',
-                data: filtered.map(d => (d.putIV - d.callIV) * 100),
-                borderColor: COLORS.netGEX,
-                backgroundColor: 'rgba(255, 234, 0, 0.05)',
-                borderWidth: 2,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                borderDash: [5, 5],
-                fill: false,
-                order: 2
-            });
+            if (showNet) {
+                datasets.push({
+                    label: 'IV Skew', data: smooth(filtered.map(d => (get(d, 'putIV', 'put_iv') - get(d, 'callIV', 'call_iv')) * 100), sw),
+                    borderColor: COLORS.net, backgroundColor: 'transparent',
+                    borderWidth: 1.5, type: 'line', xAxisID: 'x',
+                    tension: 0.4, pointRadius: 0, pointHoverRadius: 4,
+                    borderDash: [5, 5], fill: false, indexAxis: 'y', order: 2
+                });
+            }
         }
 
-        return { datasets, labels: filteredLabels, spotIndex };
+        return { datasets, labels, filtered };
     }
 
-    // ===== RENDER CHART =====
+    function buildAnnotations(filtered, levels, spotPrice) {
+        const ann = {};
+
+        const findIdx = (target) => {
+            let best = 0, diff = Infinity;
+            for (let i = 0; i < filtered.length; i++) {
+                const d = Math.abs(filtered[i].strike - target);
+                if (d < diff) { diff = d; best = i; }
+            }
+            return best;
+        };
+
+        const mkLine = (id, strike, color, text, isSpot) => {
+            const idx = findIdx(strike);
+            ann[id] = {
+                type: 'line',
+                yMin: idx, yMax: idx,
+                xScaleID: 'x', yScaleID: 'y',
+                borderColor: color,
+                borderWidth: isSpot ? 2.5 : 2,
+                borderDash: isSpot ? [8, 4] : [6, 3],
+                label: {
+                    display: true,
+                    content: text,
+                    position: isSpot ? 'start' : 'end',
+                    backgroundColor: 'rgba(10, 10, 10, 0.90)',
+                    color: color,
+                    font: { size: 10, family: "'JetBrains Mono', monospace", weight: '600' },
+                    padding: { x: 8, y: 3 },
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: color
+                }
+            };
+        };
+
+        if (showSpot && spotPrice > 0) {
+            mkLine('spotLine', spotPrice, COLORS.spot, 'Spot: $' + spotPrice.toFixed(2), true);
+        }
+        if (showCallWall && levels) {
+            const cw = levels.call_wall !== undefined ? levels.call_wall : levels.callWall;
+            if (cw > 0) mkLine('callWallLine', cw, COLORS.callWall, 'Call Wall: $' + cw.toFixed(1));
+        }
+        if (showPutWall && levels) {
+            const pw = levels.put_wall !== undefined ? levels.put_wall : levels.putWall;
+            if (pw > 0) mkLine('putWallLine', pw, COLORS.putWall, 'Put Wall: $' + pw.toFixed(1));
+        }
+        if (showInflection && levels) {
+            const inf = levels.inflection !== undefined ? levels.inflection : levels.inflection;
+            if (inf > 0) mkLine('inflectionLine', inf, COLORS.inflection, 'Inflection: $' + inf.toFixed(1));
+        }
+        if (showZeroGamma && levels) {
+            const zg = levels.zero_gamma !== undefined ? levels.zero_gamma : levels.zeroGamma;
+            if (zg > 0) mkLine('zeroGammaLine', zg, COLORS.zeroGamma, 'Zero Gamma: $' + zg.toFixed(1));
+        }
+
+        return ann;
+    }
+
     function render(data, spotPrice, series) {
         currentData = data;
+        currentSpot = spotPrice;
         activeSeries = series;
 
         const ctx = document.getElementById('gexChart');
         if (!ctx) return;
+        if (chartInstance) chartInstance.destroy();
 
-        if (chartInstance) {
-            chartInstance.destroy();
-        }
+        const { datasets, labels, filtered } = buildDatasets(data, spotPrice, series);
+        const annotations = buildAnnotations(filtered, currentLevels, spotPrice);
 
-        const { datasets, labels, spotIndex } = buildDatasets(data, spotPrice, series);
-
-        // Build legend
         const legendEl = document.getElementById('chartLegend');
         if (legendEl) {
-            legendEl.innerHTML = '';
+            const items = [];
             const seen = new Set();
-            for (const s of series) {
-                for (const item of (LEGENDS[s] || [])) {
-                    if (seen.has(item.label)) continue;
-                    seen.add(item.label);
-                    legendEl.innerHTML += `
-                        <div class="legend-item">
-                            <div class="legend-color" style="background:${item.color}"></div>
-                            <span>${item.label}</span>
-                        </div>
-                    `;
-                }
+            for (const ds of datasets) {
+                if (seen.has(ds.label)) continue;
+                seen.add(ds.label);
+                const color = typeof ds.borderColor === 'function' ? ds.borderColor : ds.borderColor;
+                items.push({ color, label: ds.label });
             }
+            if (showSpot) items.push({ color: COLORS.spot, label: 'Spot Price' });
+            if (showCallWall && currentLevels) items.push({ color: COLORS.callWall, label: 'Call Wall' });
+            if (showPutWall && currentLevels) items.push({ color: COLORS.putWall, label: 'Put Wall' });
+            if (showInflection && currentLevels) items.push({ color: COLORS.inflection, label: 'Inflection' });
+            if (showZeroGamma && currentLevels) items.push({ color: COLORS.zeroGamma, label: 'Zero Gamma' });
+
+            legendEl.innerHTML = items.map(item =>
+                '<div class="legend-item">' +
+                    '<div class="legend-color" style="background:' + item.color + '"></div>' +
+                    '<span>' + item.label + '</span>' +
+                '</div>'
+            ).join('');
         }
 
         chartInstance = new Chart(ctx, {
             type: 'bar',
-            data: {
-                labels: labels,
-                datasets: datasets
-            },
+            data: { labels, datasets },
             options: {
+                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
+                interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(18, 18, 26, 0.95)',
-                        titleColor: '#e0e0e0',
-                        bodyColor: '#888',
-                        borderColor: '#2a2a3a',
+                        backgroundColor: 'rgba(15, 15, 15, 0.95)',
+                        titleColor: '#fafafa',
+                        bodyColor: '#a3a3a3',
+                        borderColor: '#262626',
                         borderWidth: 1,
-                        padding: 12,
-                        cornerRadius: 8,
-                        titleFont: {
-                            family: "'SF Mono', Monaco, monospace",
-                            size: 13
-                        },
-                        bodyFont: {
-                            family: "'SF Mono', Monaco, monospace",
-                            size: 12
-                        },
+                        padding: 10,
+                        cornerRadius: 6,
+                        titleFont: { family: "'JetBrains Mono', monospace", size: 12, weight: '600' },
+                        bodyFont: { family: "'JetBrains Mono', monospace", size: 11 },
                         callbacks: {
-                            title: (items) => `Strike: $${items[0].label}`,
-                            label: (item) => {
-                                const val = item.raw;
-                                const formatted = formatTooltipValue(val);
-                                return `${item.dataset.label}: ${formatted}`;
-                            }
+                            title: (items) => 'Strike: $' + items[0].label,
+                            label: (item) => item.dataset.label + ': ' + fmt(item.raw)
                         }
                     },
-                    annotation: {
-                        annotations: spotIndex >= 0 ? {
-                            spotLine: {
-                                type: 'line',
-                                xMin: spotIndex,
-                                xMax: spotIndex,
-                                borderColor: 'rgba(0, 229, 255, 0.6)',
-                                borderWidth: 2,
-                                borderDash: [6, 4],
-                                label: {
-                                    content: 'Spot',
-                                    enabled: true,
-                                    position: 'start',
-                                    backgroundColor: 'rgba(0, 229, 255, 0.2)',
-                                    color: '#00e5ff',
-                                    font: { size: 11 }
-                                }
-                            }
-                        } : {}
-                    }
+                    annotation: { annotations }
                 },
                 scales: {
-                    x: {
-                        grid: {
-                            color: COLORS.grid,
-                            drawBorder: false
-                        },
-                        ticks: {
-                            color: COLORS.text,
-                            font: {
-                                family: "'SF Mono', Monaco, monospace",
-                                size: 10
-                            },
-                            maxTicksLimit: 20
-                        },
-                        border: {
-                            display: false
-                        }
-                    },
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        grid: {
-                            color: COLORS.grid,
-                            drawBorder: false
-                        },
-                        ticks: {
-                            color: COLORS.text,
-                            font: {
-                                family: "'SF Mono', Monaco, monospace",
-                                size: 10
-                            },
-                            callback: (val) => formatTooltipValue(val)
-                        },
-                        border: {
-                            display: false
-                        }
+                        grid: { color: COLORS.grid, drawBorder: false },
+                        ticks: { color: COLORS.text, font: { family: "'JetBrains Mono', monospace", size: 10 }, maxTicksLimit: 50 },
+                        border: { display: false }
                     },
-                    y1: {
+                    x: {
                         type: 'linear',
                         display: true,
-                        position: 'right',
-                        grid: {
-                            drawOnChartArea: false
-                        },
-                        ticks: {
-                            color: COLORS.textLight,
-                            font: {
-                                family: "'SF Mono', Monaco, monospace",
-                                size: 10
-                            },
-                            callback: (val) => formatTooltipValue(val)
-                        },
-                        border: {
-                            display: false
-                        }
+                        position: 'bottom',
+                        grid: { color: COLORS.grid, drawBorder: false },
+                        ticks: { color: COLORS.text, font: { family: "'JetBrains Mono', monospace", size: 9 }, callback: (val) => fmt(val) },
+                        border: { display: false }
                     }
                 },
-                animation: {
-                    duration: 400,
-                    easing: 'easeOutQuart'
-                }
+                animation: { duration: 300, easing: 'easeOutQuart' }
             }
         });
     }
 
-    // ===== TOGGLE SERIES =====
-    function toggleSeries(series) {
-        const idx = activeSeries.indexOf(series);
-        if (idx >= 0) {
-            if (activeSeries.length > 1) {
-                activeSeries.splice(idx, 1);
-            }
-        } else {
-            activeSeries.push(series);
-        }
-
-        // Update button states
-        document.querySelectorAll('.ctrl-btn').forEach(btn => {
-            const s = btn.dataset.series;
-            btn.classList.toggle('active', activeSeries.includes(s));
+    function switchSeries(series) {
+        activeSeries = series;
+        document.querySelectorAll('.series-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.series === series);
         });
-
-        if (currentData) {
-            // Need spot price from app state
-            const spotPrice = window.appState?.spotPrice || currentData[Math.floor(currentData.length / 2)].strike;
-            render(currentData, spotPrice, activeSeries);
-        }
+        if (window.appState) window.appState.activeSeries = series;
+        if (currentData && currentSpot) render(currentData, currentSpot, activeSeries);
     }
 
-    // ===== PUBLIC API =====
-    return {
-        render,
-        toggleSeries,
-        activeSeries: () => activeSeries
-    };
+    function toggleElement(el) {
+        switch (el) {
+            case 'aggregate': showAggregate = !showAggregate; break;
+            case 'net': showNet = !showNet; break;
+            case 'split': showSplit = !showSplit; break;
+            case 'callWall': showCallWall = !showCallWall; break;
+            case 'putWall': showPutWall = !showPutWall; break;
+            case 'inflection': showInflection = !showInflection; break;
+            case 'zeroGamma': showZeroGamma = !showZeroGamma; break;
+            case 'spot': showSpot = !showSpot; break;
+        }
+        if (currentData && currentSpot) render(currentData, currentSpot, activeSeries);
+    }
+
+    function setLevels(levels) { currentLevels = levels; }
+
+    return { render, switchSeries, toggleElement, setLevels, activeSeries: () => activeSeries };
 })();
+
+window.chart = ChartBuilder;
