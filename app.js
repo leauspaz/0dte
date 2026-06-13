@@ -1,5 +1,5 @@
 /* ===== APP =====
- * 0DTE GEX Analyzer — connects to local Python backend
+ * 0DTE GEX Analyzer - connects to local Python backend
  */
 
 const App = (function() {

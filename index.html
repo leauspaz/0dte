@@ -17,11 +17,8 @@
         <header class="header">
             <div class="header-left">
                 <div class="brand">
-                    <span class="brand-name">0DTE</span>
-                    <span class="brand-separator">/</span>
-                    <span class="brand-accent">GEX</span>
+                    <span class="brand-name">0dtesse</span><span style="color:var(--chart-positive)">γ</span>
                 </div>
-                <span class="tagline">Gamma Exposure Dashboard</span>
             </div>
             <div class="header-right">
                 <div class="status-pill" id="regimePill">
@@ -56,7 +53,7 @@
                         <span class="card-title">Compute GEX Levels</span>
                     </div>
                     <div class="search-box">
-                        <input type="text" id="tickerInput" placeholder="Enter ticker (e.g. SPY)" value="SPY" autocomplete="off" spellcheck="false">
+                        <input type="text" id="tickerInput" placeholder="Enter ticker (e.g. SPY)" value="^SPX" autocomplete="off" spellcheck="false">
                         <button class="search-btn" id="searchBtn" onclick="app.searchTicker()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                         </button>
@@ -64,8 +61,8 @@
 
                     <!-- Asset Tabs -->
                     <div class="asset-tabs" id="assetTabs">
-                        <button class="asset-tab active" data-class="equity" onclick="ui.switchAssetClass('equity')">Equities</button>
-                        <button class="asset-tab" data-class="index" onclick="ui.switchAssetClass('index')">Indices</button>
+                        <button class="asset-tab" data-class="equity" onclick="ui.switchAssetClass('equity')">Equities</button>
+                        <button class="asset-tab active" data-class="index" onclick="ui.switchAssetClass('index')">Indices</button>
                         <button class="asset-tab" data-class="etf" onclick="ui.switchAssetClass('etf')">ETFs</button>
                     </div>
 
@@ -110,18 +107,18 @@
                         <p class="info-lead">Gamma Exposure measures how option deltas change with price moves.</p>
                         <div class="info-section">
                             <div class="info-label positive">Positive GEX</div>
-                            <p class="info-desc">Dealers sell rallies, buy dips — <strong>stabilizing</strong></p>
+                            <p class="info-desc">Dealers sell rallies, buy dips - <strong>stabilizing</strong></p>
                         </div>
                         <div class="info-section">
                             <div class="info-label negative">Negative GEX</div>
-                            <p class="info-desc">Dealers buy rallies, sell dips — <strong>amplifying</strong></p>
+                            <p class="info-desc">Dealers buy rallies, sell dips - <strong>amplifying</strong></p>
                         </div>
                         <div class="info-section">
                             <div class="info-label">Key Levels</div>
                             <ul class="info-list">
-                                <li><span class="dot call"></span> Call Wall — resistance</li>
-                                <li><span class="dot put"></span> Put Wall — support</li>
-                                <li><span class="dot flip"></span> Gamma Flip — regime change</li>
+                                <li><span class="dot call"></span> Call Wall - resistance</li>
+                                <li><span class="dot put"></span> Put Wall - support</li>
+                                <li><span class="dot flip"></span> Gamma Flip - regime change</li>
                             </ul>
                         </div>
                     </div>

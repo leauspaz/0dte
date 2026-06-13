@@ -1,5 +1,5 @@
 /* ===== CHART BUILDER =====
- * Horizontal GEX chart — normalized Y-axis, no zoom, clean interaction
+ * Horizontal GEX chart - normalized Y-axis, no zoom, clean interaction
  */
 
 const ChartBuilder = (function() {

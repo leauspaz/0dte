@@ -9,7 +9,7 @@ const UIManager = (function() {
         etf: ['SPY', 'QQQ', 'IWM', 'DIA', 'XLF', 'XLK', 'XLE', 'XLU', 'XLI', 'XLP', 'XLB', 'XRT', 'XHB', 'KRE', 'SMH', 'SOXX', 'IBB', 'XBI', 'ARKK', 'TLT', 'HYG', 'LQD', 'EFA', 'EEM', 'IEFA', 'VEA', 'VWO', 'VTI', 'VOO', 'QQQM']
     };
 
-    let currentAssetClass = 'equity';
+    let currentAssetClass = 'index';
     let sidebarOpen = false;
 
     function formatDate(timestamp) {
@@ -265,19 +265,19 @@ const UIManager = (function() {
         let html = '';
         if (isPositiveGamma) {
             html += `<p><span class="highlight-positive">Positive Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>above</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
-            html += `<p>Market makers are <strong>net long gamma</strong> and will <span class="highlight-positive">sell into rallies, buy into dips</span> — this is a <strong>stabilizing, mean-reverting</strong> regime.</p>`;
+            html += `<p>Market makers are <strong>net long gamma</strong> and will <span class="highlight-positive">sell into rallies, buy into dips</span> - this is a <strong>stabilizing, mean-reverting</strong> regime.</p>`;
             html += `<p>The Call Wall at <span class="highlight-positive">$${formatPrice(callWall)}</span> (${distToCall > 0 ? '+' : ''}${formatPrice(distToCall)} away) acts as resistance where selling pressure may intensify.</p>`;
             html += `<p>The Put Wall at <span class="highlight-negative">$${formatPrice(putWall)}</span> (${distToPut > 0 ? '+' : ''}${formatPrice(distToPut)} below) acts as support where buying interest may emerge.</p>`;
-            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} — ${netDEX > 0 ? 'net long delta (bullish bias)' : 'net short delta (bearish bias)'}</p>`;
+            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} - ${netDEX > 0 ? 'net long delta (bullish bias)' : 'net short delta (bearish bias)'}</p>`;
         } else {
             html += `<p><span class="highlight-negative">Negative Gamma Zone:</span> Price ($${formatPrice(spot)}) is <strong>below</strong> the inflection point ($${formatPrice(inflection)}).</p>`;
-            html += `<p>Market makers are <strong>net short gamma</strong> and will <span class="highlight-negative">buy into rallies, sell into dips</span> — this is an <strong>amplifying, trending/volatile</strong> regime.</p>`;
+            html += `<p>Market makers are <strong>net short gamma</strong> and will <span class="highlight-negative">buy into rallies, sell into dips</span> - this is an <strong>amplifying, trending/volatile</strong> regime.</p>`;
             html += `<p>The inflection at <span class="highlight-warn">$${formatPrice(inflection)}</span> (${distToInflection > 0 ? '+' : ''}${formatPrice(distToInflection)} above) is the key level to reclaim for stabilization.</p>`;
             html += `<p>Below the Put Wall at <span class="highlight-negative">$${formatPrice(putWall)}</span>, downside moves may accelerate as dealers are forced to sell into weakness.</p>`;
-            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} — ${netDEX > 0 ? 'net long delta (bullish bias despite negative gamma)' : 'net short delta (bearish bias amplified)'}</p>`;
+            html += `<p><strong>Net DEX:</strong> ${formatNumber(netDEX)} - ${netDEX > 0 ? 'net long delta (bullish bias despite negative gamma)' : 'net short delta (bearish bias amplified)'}</p>`;
         }
-        html += `<p style="margin-top:12px;"><strong>Vanna:</strong> ${formatNumber(totalVanna)} — ${Math.abs(totalVanna) > 1000000 ? 'High vol sensitivity. IV moves will shift delta significantly.' : 'Moderate vol sensitivity.'}</p>`;
-        html += `<p><strong>Charm:</strong> ${formatNumber(totalCharm)} — ${Math.abs(totalCharm) > 500000 ? 'Significant time decay. Delta hedges will shift rapidly into expiry.' : 'Normal time decay profile.'}</p>`;
+        html += `<p style="margin-top:12px;"><strong>Vanna:</strong> ${formatNumber(totalVanna)} - ${Math.abs(totalVanna) > 1000000 ? 'High vol sensitivity. IV moves will shift delta significantly.' : 'Moderate vol sensitivity.'}</p>`;
+        html += `<p><strong>Charm:</strong> ${formatNumber(totalCharm)} - ${Math.abs(totalCharm) > 500000 ? 'Significant time decay. Delta hedges will shift rapidly into expiry.' : 'Normal time decay profile.'}</p>`;
         content.innerHTML = html;
     }
 
@@ -338,7 +338,7 @@ const UIManager = (function() {
     }
 
     function init() {
-        renderTickerGrid(TICKER_PRESETS.equity);
+        renderTickerGrid(TICKER_PRESETS.index);
         document.addEventListener('click', (e) => {
             const sidebar = document.getElementById('sidebar');
             const toggle = document.getElementById('mobileNavToggle');
